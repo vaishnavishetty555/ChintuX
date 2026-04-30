@@ -1,16 +1,14 @@
 import SwiftUI
-import SwiftData
 
 /// PRD §6.7 — Pets tab. List, add, switch, Memorial section.
 struct PetsView: View {
-    @Query(sort: [SortDescriptor(\Pet.createdAt)]) private var allPets: [Pet]
-    @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject var dataStore: DataStore
     @EnvironmentObject var petContext: PetContextStore
     @State private var showingAdd = false
 
-    private var active: [Pet] { allPets.filter { $0.status == .active } }
-    private var memorial: [Pet] { allPets.filter { $0.status == .passed } }
-    private var lost: [Pet] { allPets.filter { $0.status == .lost } }
+    private var active: [PetDTO] { dataStore.pets.filter { $0.statusRaw == "active" } }
+    private var memorial: [PetDTO] { dataStore.pets.filter { $0.statusRaw == "passed" } }
+    private var lost: [PetDTO] { dataStore.pets.filter { $0.statusRaw == "lost" } }
 
     var body: some View {
         NavigationStack {
@@ -19,8 +17,8 @@ struct PetsView: View {
                     header
 
                     ForEach(active) { pet in
-                        NavigationLink(destination: PetProfileView(pet: pet)) {
-                            PetListRow(pet: pet, active: pet.id == petContext.activePetID)
+                        NavigationLink(destination: PetProfileViewDTO(pet: pet)) {
+                            PetListRowDTO(pet: pet, active: pet.id == petContext.activePetID)
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Open \(pet.name)'s profile")
@@ -32,8 +30,8 @@ struct PetsView: View {
                             .foregroundStyle(PawlyColors.alert)
                             .padding(.top, Spacing.s)
                         ForEach(lost) { pet in
-                            NavigationLink(destination: PetProfileView(pet: pet)) {
-                                PetListRow(pet: pet, active: false, badge: "Lost")
+                            NavigationLink(destination: PetProfileViewDTO(pet: pet)) {
+                                PetListRowDTO(pet: pet, active: false, badge: "Lost")
                             }
                             .buttonStyle(.plain)
                         }
@@ -45,8 +43,8 @@ struct PetsView: View {
                             .foregroundStyle(PawlyColors.slate)
                             .padding(.top, Spacing.s)
                         ForEach(memorial) { pet in
-                            NavigationLink(destination: PetProfileView(pet: pet)) {
-                                PetListRow(pet: pet, active: false, badge: "Memorial")
+                            NavigationLink(destination: PetProfileViewDTO(pet: pet)) {
+                                PetListRowDTO(pet: pet, active: false, badge: "Memorial")
                             }
                             .buttonStyle(.plain)
                         }
@@ -74,6 +72,9 @@ struct PetsView: View {
                 OnboardingCoordinator(onComplete: { showingAdd = false })
                     .interactiveDismissDisabled(false)
             }
+            .refreshable {
+                await dataStore.fetchAllData()
+            }
         }
     }
 
@@ -89,8 +90,8 @@ struct PetsView: View {
     }
 }
 
-struct PetListRow: View {
-    let pet: Pet
+struct PetListRowDTO: View {
+    let pet: PetDTO
     var active: Bool
     var badge: String? = nil
     @EnvironmentObject var petContext: PetContextStore
@@ -98,7 +99,7 @@ struct PetListRow: View {
     var body: some View {
         PawlyCard {
             HStack(spacing: Spacing.m) {
-                PetAvatar(pet: pet, size: 56)
+                PetAvatarDTO(pet: pet, size: 56)
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
                         Text(pet.name).font(PawlyFont.headingMedium).foregroundStyle(PawlyColors.ink)
@@ -117,7 +118,7 @@ struct PetListRow: View {
                                 .foregroundStyle(PawlyColors.slate)
                         }
                     }
-                    Text("\(pet.species.displayName) • \(pet.breed.isEmpty ? "Mixed" : pet.breed) • \(pet.ageDescription)")
+                    Text("\(Species(rawValue: pet.speciesRaw)?.displayName ?? pet.speciesRaw) • \(pet.breed.isEmpty ? "Mixed" : pet.breed) • \(ageDescription)")
                         .font(PawlyFont.caption)
                         .foregroundStyle(PawlyColors.slate)
                 }
@@ -135,10 +136,20 @@ struct PetListRow: View {
             }
         }
     }
+    
+    private var ageDescription: String {
+        guard let dob = pet.dateOfBirth else { return "Unknown age" }
+        let comps = Calendar.current.dateComponents([.year, .month], from: dob, to: .now)
+        let y = comps.year ?? 0
+        let m = comps.month ?? 0
+        if y == 0 { return "\(max(0, m))mo" }
+        if m == 0 { return "\(y)y" }
+        return "\(y)y \(m)mo"
+    }
 }
 
 #Preview("Pets") {
     PetsView()
-        .environmentObject(PreviewSupport.previewPetContext)
-        .modelContainer(PreviewSupport.container)
+        .environmentObject(PetContextStore())
+        .environmentObject(DataStore.shared)
 }

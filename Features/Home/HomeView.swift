@@ -1,17 +1,12 @@
 import SwiftUI
-import SwiftData
 
 /// PRD §6.2 — Home tab. Top-to-bottom composition.
 struct HomeView: View {
-    @Query(
-        filter: #Predicate<Pet> { $0.statusRaw == "active" },
-        sort: [SortDescriptor(\Pet.createdAt)]
-    ) private var pets: [Pet]
-
     @EnvironmentObject var petContext: PetContextStore
+    @EnvironmentObject var dataStore: DataStore
 
-    var activePet: Pet? {
-        pets.first(where: { $0.id == petContext.activePetID }) ?? pets.first
+    var activePet: PetDTO? {
+        dataStore.pets.first(where: { $0.id == petContext.activePetID }) ?? dataStore.pets.first
     }
 
     var body: some View {
@@ -19,7 +14,7 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: Spacing.m) {
                 // Pet switcher + greeting row
                 HStack(alignment: .center) {
-                    PetSwitcherCarousel(pets: pets)
+                    PetSwitcherCarousel(pets: dataStore.pets)
                     Spacer()
                     VStack(alignment: .trailing, spacing: 0) {
                         Text("Today").font(PawlyFont.caption).foregroundStyle(PawlyColors.slate)
@@ -44,47 +39,64 @@ struct HomeView: View {
             .padding(.bottom, Spacing.xxl)
         }
         .background(PawlyColors.cream.ignoresSafeArea())
+        .refreshable {
+            await dataStore.fetchAllData()
+        }
     }
 }
 
 // MARK: - Pet header
 
 private struct PetHeaderCard: View {
-    @Environment(\.modelContext) private var modelContext
-    let pet: Pet
+    let pet: PetDTO
 
     var body: some View {
         PawlyCard {
             HStack(alignment: .center, spacing: Spacing.m) {
-                PetAvatar(pet: pet, size: 68)
+                PetAvatarDTO(pet: pet, size: 68)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(pet.name)
                         .font(PawlyFont.displayMedium)
                         .foregroundStyle(PawlyColors.ink)
-                    Text("\(pet.species.displayName) • \(pet.ageDescription)")
+                    Text("\(Species(rawValue: pet.speciesRaw)?.displayName ?? pet.speciesRaw) • \(ageDescription)")
                         .font(PawlyFont.bodyMedium)
                         .foregroundStyle(PawlyColors.slate)
                 }
                 Spacer()
-                MoodSelector(pet: pet)
+                MoodSelectorDTO(pet: pet)
             }
         }
     }
+    
+    private var ageDescription: String {
+        guard let dob = pet.dateOfBirth else { return "Unknown age" }
+        let comps = Calendar.current.dateComponents([.year, .month], from: dob, to: .now)
+        let y = comps.year ?? 0
+        let m = comps.month ?? 0
+        if y == 0 { return "\(max(0, m))mo" }
+        if m == 0 { return "\(y)y" }
+        return "\(y)y \(m)mo"
+    }
 }
 
-struct PetAvatar: View {
-    let pet: Pet
+struct PetAvatarDTO: View {
+    let pet: PetDTO
     var size: CGFloat = 56
 
     var body: some View {
         ZStack {
-            if let data = pet.photoData, let ui = UIImage(data: data) {
-                Image(uiImage: ui).resizable().scaledToFill()
+            if let photoURL = pet.photoURL,
+               let url = URL(string: photoURL) {
+                AsyncImage(url: url) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: {
+                    Color(hex: pet.accentHex)
+                }
             } else {
                 Color(hex: pet.accentHex)
                     .overlay(
-                        Image(systemName: pet.species.sfSymbol)
+                        Image(systemName: Species(rawValue: pet.speciesRaw)?.sfSymbol ?? "pawprint.fill")
                             .foregroundStyle(Color.white.opacity(0.9))
                             .font(.system(size: size * 0.4, weight: .semibold))
                     )
@@ -101,24 +113,26 @@ struct PetAvatar: View {
 
 // MARK: - Mood selector
 
-struct MoodSelector: View {
-    @Environment(\.modelContext) private var modelContext
-    let pet: Pet
+struct MoodSelectorDTO: View {
+    @EnvironmentObject var dataStore: DataStore
+    let pet: PetDTO
     @State private var showing = false
 
-    private var latest: Mood? {
-        pet.moodEntries.max(by: { $0.at < $1.at })?.mood
+    private var latest: MoodType? {
+        guard let moodRaw = dataStore.moodEntries(forPetId: pet.id).first?.moodRaw else { return nil }
+        return MoodType(rawValue: moodRaw)
     }
 
     var body: some View {
         Menu {
-            ForEach(Mood.allCases) { m in
+            ForEach(MoodType.allCases) { m in
                 Button {
                     Haptics.light()
-                    modelContext.insert(MoodEntry(pet: pet, mood: m))
-                    try? modelContext.save()
+                    Task {
+                        await dataStore.createMoodEntry(forPetId: pet.id, mood: m)
+                    }
                 } label: {
-                    Label("\(m.emoji)  \(m.label)", systemImage: "")
+                    Label("\(m.emoji)  \(m.displayName)", systemImage: "")
                 }
             }
         } label: {
@@ -135,22 +149,31 @@ struct MoodSelector: View {
 // MARK: - Today summary
 
 private struct TodaySummaryCard: View {
-    let pet: Pet
+    @EnvironmentObject var dataStore: DataStore
+    let pet: PetDTO
 
     private var startOfDay: Date { Date().startOfDay }
     private var endOfDay:   Date { Date().endOfDay }
 
     private var mealsLogged: Int {
-        pet.logEntries.filter { $0.kind == .meal && $0.at >= startOfDay && $0.at <= endOfDay }.count
+        dataStore.logEntries(forPetId: pet.id)
+            .filter { $0.kindRaw == "meal" && $0.at >= startOfDay && $0.at <= endOfDay }
+            .count
     }
     private var medsGiven: Int {
-        pet.reminders.flatMap(\.instances).filter {
-            $0.status == .completed && ($0.completedAt ?? .distantPast) >= startOfDay
-                && ($0.completedAt ?? .distantPast) <= endOfDay
-        }.count
+        dataStore.reminderInstances
+            .filter { instance in
+                dataStore.reminders(forPetId: pet.id).contains(where: { $0.id == instance.reminderId }) &&
+                instance.statusRaw == "completed" &&
+                (instance.completedAt ?? .distantPast) >= startOfDay &&
+                (instance.completedAt ?? .distantPast) <= endOfDay
+            }
+            .count
     }
     private var walksDone: Int {
-        pet.logEntries.filter { $0.kind == .walk && $0.at >= startOfDay && $0.at <= endOfDay }.count
+        dataStore.logEntries(forPetId: pet.id)
+            .filter { $0.kindRaw == "walk" && $0.at >= startOfDay && $0.at <= endOfDay }
+            .count
     }
 
     var body: some View {
@@ -188,14 +211,18 @@ private struct TodaySummaryCard: View {
 // MARK: - Up next reminders
 
 private struct UpNextCard: View {
-    @Environment(\.modelContext) private var modelContext
-    let pet: Pet
+    @EnvironmentObject var dataStore: DataStore
+    let pet: PetDTO
 
-    private var upcoming: [ReminderInstance] {
+    private var upcoming: [ReminderInstanceDTO] {
         let now = Date()
-        let all = pet.reminders.flatMap(\.instances)
-        return all
-            .filter { $0.status == .upcoming && $0.scheduledAt >= now.addingTimeInterval(-600) }
+        let petReminderIds = dataStore.reminders(forPetId: pet.id).map { $0.id }
+        return dataStore.reminderInstances
+            .filter { instance in
+                petReminderIds.contains(instance.reminderId ?? UUID()) &&
+                instance.statusRaw == "upcoming" &&
+                instance.scheduledAt >= now.addingTimeInterval(-600)
+            }
             .sorted { $0.scheduledAt < $1.scheduledAt }
             .prefix(2)
             .map { $0 }
@@ -207,7 +234,7 @@ private struct UpNextCard: View {
                 HStack {
                     Text("Up next").font(PawlyFont.headingMedium).foregroundStyle(PawlyColors.ink)
                     Spacer()
-                    NavigationLink(destination: RemindersListView(pet: pet)) {
+                    NavigationLink(destination: RemindersListViewDTO(pet: pet)) {
                         Text("See all").font(PawlyFont.caption).foregroundStyle(PawlyColors.forest)
                     }
                 }
@@ -218,7 +245,7 @@ private struct UpNextCard: View {
                         .padding(.vertical, Spacing.s)
                 } else {
                     ForEach(upcoming) { inst in
-                        UpNextRow(instance: inst) {
+                        UpNextRowDTO(instance: inst) {
                             markDone(inst)
                         }
                     }
@@ -227,28 +254,34 @@ private struct UpNextCard: View {
         }
     }
 
-    private func markDone(_ inst: ReminderInstance) {
+    private func markDone(_ inst: ReminderInstanceDTO) {
         Haptics.success()
-        inst.status = .completed
-        inst.completedAt = .now
-        try? modelContext.save()
+        Task {
+            await dataStore.toggleReminderInstance(inst)
+        }
     }
 }
 
-private struct UpNextRow: View {
-    let instance: ReminderInstance
+private struct UpNextRowDTO: View {
+    @EnvironmentObject var dataStore: DataStore
+    let instance: ReminderInstanceDTO
     var onMarkDone: () -> Void
+    
+    private var reminder: ReminderDTO? {
+        dataStore.reminders.first { $0.id == instance.reminderId }
+    }
 
     var body: some View {
         HStack(spacing: Spacing.m) {
-            if let type = instance.reminder?.type {
+            if let reminder = reminder,
+               let type = ReminderType(rawValue: reminder.typeRaw) {
                 Image(systemName: type.sfSymbol)
                     .foregroundStyle(PawlyColors.forest)
                     .frame(width: 36, height: 36)
                     .background(Circle().fill(PawlyColors.cream))
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(instance.reminder?.title ?? "Reminder")
+                Text(reminder?.title ?? "Reminder")
                     .font(PawlyFont.bodyLarge).foregroundStyle(PawlyColors.ink)
                 Text(instance.scheduledAt, format: .dateTime.hour().minute())
                     .font(PawlyFont.caption).foregroundStyle(PawlyColors.slate)
@@ -269,12 +302,16 @@ private struct UpNextRow: View {
 // MARK: - Activity feed
 
 private struct ActivityFeedCard: View {
-    let pet: Pet
+    @EnvironmentObject var dataStore: DataStore
+    let pet: PetDTO
 
     private var items: [ActivityItem] {
-        let logs = pet.logEntries.map { ActivityItem.log($0) }
-        let doneInstances = pet.reminders.flatMap(\.instances)
-            .filter { $0.status == .completed && $0.completedAt != nil }
+        let logs = dataStore.logEntries(forPetId: pet.id).map { ActivityItem.log($0) }
+        let doneInstances = dataStore.reminderInstances
+            .filter { instance in
+                dataStore.reminders(forPetId: pet.id).contains(where: { $0.id == instance.reminderId }) &&
+                instance.statusRaw == "completed" && instance.completedAt != nil
+            }
             .map { ActivityItem.instance($0) }
         return (logs + doneInstances)
             .sorted { $0.date > $1.date }
@@ -313,8 +350,8 @@ private struct ActivityFeedCard: View {
     }
 
     enum ActivityItem: Identifiable {
-        case log(LogEntry)
-        case instance(ReminderInstance)
+        case log(LogEntryDTO)
+        case instance(ReminderInstanceDTO)
 
         var id: UUID {
             switch self {
@@ -329,17 +366,24 @@ private struct ActivityFeedCard: View {
             }
         }
         var symbol: String {
-            switch self {
-            case .log(let l): return l.kind.sfSymbol
-            case .instance(let i): return i.reminder?.type.sfSymbol ?? "checkmark"
+            @MainActor
+            get {
+                switch self {
+                case .log(let l):
+                    return LogKind(rawValue: l.kindRaw)?.sfSymbol ?? "circle"
+                case .instance(let i):
+                    // Access dataStore through the environment in the view, not here
+                    return "checkmark"
+                }
             }
         }
         var title: String {
             switch self {
             case .log(let l):
-                return "\(l.kind.displayName): \(l.detail.isEmpty ? "logged" : l.detail)"
+                let kind = LogKind(rawValue: l.kindRaw)
+                return "\(kind?.displayName ?? "Log"): \(l.detail.isEmpty ? "logged" : l.detail)"
             case .instance(let i):
-                return "\(i.reminder?.title ?? "Reminder") — done"
+                return "Reminder — done"
             }
         }
     }
@@ -348,19 +392,24 @@ private struct ActivityFeedCard: View {
 // MARK: - Discover prompt (contextual)
 
 private struct DiscoverPromptCard: View {
-    let pet: Pet
+    @EnvironmentObject var dataStore: DataStore
+    let pet: PetDTO
 
     private var message: String? {
         // PRD example: "It has been 27 days since deworming".
-        if let last = pet.reminders
-            .first(where: { $0.type == .dewormingTickFlea })?
-            .instances
-            .filter({ $0.status == .completed })
-            .max(by: { ($0.completedAt ?? .distantPast) < ($1.completedAt ?? .distantPast) }),
-           let when = last.completedAt {
-            let days = Date().daysFrom(when)
-            if days >= 20 {
-                return "It has been \(days) days since deworming. A gentle reminder — most products cover 30."
+        let dewormingReminder = dataStore.reminders(forPetId: pet.id)
+            .first { $0.typeRaw == "dewormingTickFlea" }
+        
+        if let reminder = dewormingReminder {
+            let completedInstance = dataStore.reminderInstances(forReminderId: reminder.id)
+                .filter { $0.statusRaw == "completed" }
+                .max { ($0.completedAt ?? .distantPast) < ($1.completedAt ?? .distantPast) }
+            
+            if let when = completedInstance?.completedAt {
+                let days = Date().daysFrom(when)
+                if days >= 20 {
+                    return "It has been \(days) days since deworming. A gentle reminder — most products cover 30."
+                }
             }
         }
         return nil
@@ -409,6 +458,6 @@ private struct EmptyPetsState: View {
 
 #Preview("Home") {
     HomeView()
-        .environmentObject(PreviewSupport.previewPetContext)
-        .modelContainer(PreviewSupport.container)
+        .environmentObject(PetContextStore())
+        .environmentObject(DataStore.shared)
 }

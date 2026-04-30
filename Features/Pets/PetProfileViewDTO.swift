@@ -1,10 +1,9 @@
 import SwiftUI
-import SwiftData
 
 /// PRD §6.7 — Pet profile with tabs: Overview, Health, Meds, Logs, Documents.
-struct PetProfileView: View {
-    let pet: Pet
-    @Environment(\.modelContext) private var modelContext
+struct PetProfileViewDTO: View {
+    let pet: PetDTO
+    @EnvironmentObject var dataStore: DataStore
     @Environment(\.dismiss) private var dismiss
 
     enum ProfileTab: String, CaseIterable {
@@ -45,8 +44,8 @@ struct PetProfileView: View {
                     Button(role: .destructive) { confirmPassed = true } label: {
                         Label("Mark as passed", systemImage: "leaf.fill")
                     }
-                    if pet.status != .active {
-                        Button { setStatus(.active) } label: { Label("Restore", systemImage: "arrow.uturn.backward") }
+                    if pet.statusRaw != "active" {
+                        Button { setStatus("active") } label: { Label("Restore", systemImage: "arrow.uturn.backward") }
                     }
                 } label: { Image(systemName: "ellipsis.circle").tint(PawlyColors.forest) }
             }
@@ -54,14 +53,14 @@ struct PetProfileView: View {
         .alert("Mark \(pet.name) as lost?",
                isPresented: $confirmLost) {
             Button("Cancel", role: .cancel) {}
-            Button("Mark lost", role: .destructive) { setStatus(.lost) }
+            Button("Mark lost", role: .destructive) { setStatus("lost") }
         } message: {
             Text("You'll be able to share a found-my-pet card with your photo and contact.")
         }
         .alert("Mark \(pet.name) as passed?",
                isPresented: $confirmPassed) {
             Button("Cancel", role: .cancel) {}
-            Button("Mark passed", role: .destructive) { setStatus(.passed) }
+            Button("Mark passed", role: .destructive) { setStatus("passed") }
         } message: {
             Text("Reminders will stop. \(pet.name)'s history will be kept in a Memorial section.")
         }
@@ -73,24 +72,24 @@ struct PetProfileView: View {
         PawlyCard {
             VStack(alignment: .leading, spacing: Spacing.s) {
                 HStack(spacing: Spacing.m) {
-                    PetAvatarDTO(pet: PetDTO(from: pet), size: 84)
+                    PetAvatarDTO(pet: pet, size: 84)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(pet.name).font(PawlyFont.displayMedium).foregroundStyle(PawlyColors.ink)
-                        Text("\(pet.species.displayName) • \(pet.breed.isEmpty ? "Mixed" : pet.breed)")
+                        Text("\(Species(rawValue: pet.speciesRaw)?.displayName ?? pet.speciesRaw) • \(pet.breed.isEmpty ? "Mixed" : pet.breed)")
                             .font(PawlyFont.bodyMedium)
                             .foregroundStyle(PawlyColors.slate)
-                        Text(pet.ageDescription).font(PawlyFont.caption).foregroundStyle(PawlyColors.slate)
+                        Text(ageDescription).font(PawlyFont.caption).foregroundStyle(PawlyColors.slate)
                     }
                     Spacer()
                 }
-                if pet.status == .lost {
+                if pet.statusRaw == "lost" {
                     Text("Lost — please help")
                         .font(PawlyFont.caption)
                         .padding(.horizontal, 10).padding(.vertical, 4)
                         .background(Capsule().fill(PawlyColors.alert))
                         .foregroundStyle(.white)
                 }
-                if pet.status == .passed {
+                if pet.statusRaw == "passed" {
                     Text("In loving memory")
                         .font(PawlyFont.caption)
                         .padding(.horizontal, 10).padding(.vertical, 4)
@@ -99,6 +98,16 @@ struct PetProfileView: View {
                 }
             }
         }
+    }
+    
+    private var ageDescription: String {
+        guard let dob = pet.dateOfBirth else { return "Unknown age" }
+        let comps = Calendar.current.dateComponents([.year, .month], from: dob, to: .now)
+        let y = comps.year ?? 0
+        let m = comps.month ?? 0
+        if y == 0 { return "\(max(0, m))mo" }
+        if m == 0 { return "\(y)y" }
+        return "\(y)y \(m)mo"
     }
 
     // MARK: - Tab bar
@@ -127,8 +136,8 @@ struct PetProfileView: View {
 
     private var overviewTab: some View {
         VStack(alignment: .leading, spacing: Spacing.s) {
-            infoRow("Weight", value: pet.weightKg.map { "\($0) kg" } ?? "—")
-            infoRow("Sex", value: pet.sex.displayName)
+            infoRow("Weight", value: pet.weightKg.map { "\(String(format: "%.1f", $0)) kg" } ?? "—")
+            infoRow("Sex", value: PetSex(rawValue: pet.sexRaw)?.displayName ?? "Unknown")
             infoRow("Neutered", value: pet.neutered ? "Yes" : "No")
             infoRow("Allergies", value: pet.allergiesText.isEmpty ? "None recorded" : pet.allergiesText)
             infoRow("Vet", value: pet.vetName.isEmpty ? "Not set" : pet.vetName)
@@ -140,7 +149,7 @@ struct PetProfileView: View {
             PawlyCard {
                 VStack(alignment: .leading, spacing: Spacing.xs) {
                     Text("Vaccinations").font(PawlyFont.headingMedium)
-                    let vaccines = pet.reminders.filter { $0.type == .vaccination }
+                    let vaccines = dataStore.reminders(forPetId: pet.id).filter { $0.typeRaw == "vaccination" }
                     if vaccines.isEmpty {
                         Text("No vaccination reminders yet.").font(PawlyFont.bodyMedium).foregroundStyle(PawlyColors.slate)
                     } else {
@@ -148,8 +157,10 @@ struct PetProfileView: View {
                             HStack {
                                 Text(v.title).font(PawlyFont.bodyMedium).foregroundStyle(PawlyColors.ink)
                                 Spacer()
-                                Text(v.recurrence.displayDescription)
-                                    .font(PawlyFont.caption).foregroundStyle(PawlyColors.slate)
+                                if let recurrence = Recurrence(rawString: v.recurrenceRaw) {
+                                    Text(recurrence.displayDescription)
+                                        .font(PawlyFont.caption).foregroundStyle(PawlyColors.slate)
+                                }
                             }
                         }
                     }
@@ -163,18 +174,17 @@ struct PetProfileView: View {
                         .foregroundStyle(PawlyColors.slate)
                 }
             }
-            WeightCurveCard(pet: pet)
         }
     }
 
     private var medsTab: some View {
-        RemindersListView(pet: pet)
+        RemindersListViewDTO(pet: pet)
             .frame(minHeight: 300)
     }
 
     private var logsTab: some View {
         VStack(alignment: .leading, spacing: Spacing.s) {
-            let sorted = pet.logEntries.sorted(by: { $0.at > $1.at })
+            let sorted = dataStore.logEntries(forPetId: pet.id).sorted(by: { $0.at > $1.at })
             if sorted.isEmpty {
                 PawlyCard {
                     Text("No logs yet. Use the + button to log meals, meds, walks.")
@@ -184,9 +194,11 @@ struct PetProfileView: View {
                 ForEach(sorted) { log in
                     PawlyCard {
                         HStack(spacing: Spacing.m) {
-                            Image(systemName: log.kind.sfSymbol).foregroundStyle(PawlyColors.forest)
+                            if let kind = LogKind(rawValue: log.kindRaw) {
+                                Image(systemName: kind.sfSymbol).foregroundStyle(PawlyColors.forest)
+                            }
                             VStack(alignment: .leading) {
-                                Text("\(log.kind.displayName): \(log.detail.isEmpty ? "—" : log.detail)")
+                                Text("\(LogKind(rawValue: log.kindRaw)?.displayName ?? "Log"): \(log.detail.isEmpty ? "—" : log.detail)")
                                     .font(PawlyFont.bodyMedium)
                                 Text(log.at, format: .dateTime.month(.abbreviated).day().hour().minute())
                                     .font(PawlyFont.caption).foregroundStyle(PawlyColors.slate)
@@ -200,7 +212,7 @@ struct PetProfileView: View {
     }
 
     private var documentsTab: some View {
-        VaultHomeView(pet: pet)
+        VaultHomeViewDTO(pet: pet)
     }
 
     @ViewBuilder
@@ -214,53 +226,64 @@ struct PetProfileView: View {
         }
     }
 
-    private func setStatus(_ new: PetStatus) {
-        pet.status = new
-        switch new {
-        case .lost:   pet.markedLostAt = .now
-        case .passed: pet.markedPassedAt = .now
-        case .active: break
+    private func setStatus(_ newStatus: String) {
+        Task {
+            var updatedPet = pet
+            // Create new pet with updated status - we need to recreate the DTO
+            // This is a simplified version - in production, you'd want a proper update method
+            let dto = PetDTO(
+                id: pet.id,
+                name: pet.name,
+                speciesRaw: pet.speciesRaw,
+                breed: pet.breed,
+                dateOfBirth: pet.dateOfBirth,
+                weightKg: pet.weightKg,
+                sexRaw: pet.sexRaw,
+                neutered: pet.neutered,
+                allergiesText: pet.allergiesText,
+                ongoingConditionsText: pet.ongoingConditionsText,
+                accentHex: pet.accentHex,
+                photoURL: pet.photoURL,
+                statusRaw: newStatus,
+                markedPassedAt: newStatus == "passed" ? Date() : pet.markedPassedAt,
+                markedLostAt: newStatus == "lost" ? Date() : pet.markedLostAt,
+                vetName: pet.vetName,
+                vetPhone: pet.vetPhone,
+                createdAt: pet.createdAt,
+                userId: pet.userId
+            )
+            await dataStore.updatePet(dto)
         }
-        try? modelContext.save()
     }
 }
 
-// MARK: - Weight curve (simple)
+// MARK: - Vault Home View DTO (Placeholder)
 
-private struct WeightCurveCard: View {
-    let pet: Pet
-
-    private var weightLogs: [LogEntry] {
-        pet.logEntries
-            .filter { $0.kind == .weight && $0.numericValue != nil }
-            .sorted(by: { $0.at < $1.at })
-    }
-
+struct VaultHomeViewDTO: View {
+    let pet: PetDTO
+    @EnvironmentObject var dataStore: DataStore
+    
     var body: some View {
-        PawlyCard {
-            VStack(alignment: .leading, spacing: Spacing.xs) {
-                Text("Weight curve").font(PawlyFont.headingMedium)
-                if weightLogs.count < 2 {
-                    Text("Log weight over time to see a curve here.")
+        VStack(alignment: .leading, spacing: Spacing.s) {
+            let docs = dataStore.documents(forPetId: pet.id)
+            if docs.isEmpty {
+                PawlyCard {
+                    Text("No documents yet. Upload vaccine cards, prescriptions, and more.")
                         .font(PawlyFont.bodyMedium).foregroundStyle(PawlyColors.slate)
-                } else {
-                    GeometryReader { geo in
-                        let values = weightLogs.compactMap { $0.numericValue }
-                        let minV = (values.min() ?? 0) - 0.3
-                        let maxV = (values.max() ?? 1) + 0.3
-                        let stepX = geo.size.width / CGFloat(max(1, values.count - 1))
-                        Path { path in
-                            for (i, v) in values.enumerated() {
-                                let x = CGFloat(i) * stepX
-                                let normalized = (v - minV) / max(0.001, (maxV - minV))
-                                let y = geo.size.height * (1 - CGFloat(normalized))
-                                if i == 0 { path.move(to: CGPoint(x: x, y: y)) }
-                                else { path.addLine(to: CGPoint(x: x, y: y)) }
+                }
+            } else {
+                ForEach(docs) { doc in
+                    PawlyCard {
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text(doc.title).font(PawlyFont.bodyMedium)
+                                if let type = DocumentType(rawValue: doc.documentTypeRaw) {
+                                    Text(type.displayName).font(PawlyFont.caption).foregroundStyle(PawlyColors.slate)
+                                }
                             }
+                            Spacer()
                         }
-                        .stroke(PawlyColors.forest, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
                     }
-                    .frame(height: 80)
                 }
             }
         }

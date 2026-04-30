@@ -17,6 +17,11 @@ settings:
     CODE_SIGNING_REQUIRED: NO
     CODE_SIGNING_ALLOWED: NO
 
+packages:
+  supabase-swift:
+    url: https://github.com/supabase/supabase-swift.git
+    from: 2.5.0
+
 targets:
   Pawly:
     type: application
@@ -31,6 +36,9 @@ targets:
           - "PawlyTests"
     resources:
       - path: Assets.xcassets
+    dependencies:
+      - package: supabase-swift
+        product: Supabase
     info:
       path: Info.plist
       properties:

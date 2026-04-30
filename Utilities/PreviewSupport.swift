@@ -27,11 +27,14 @@ enum PreviewSupport {
 
     static let previewPetContext: PetContextStore = {
         let store = PetContextStore()
-        // Pick the first pet as active for previews.
-        let desc = FetchDescriptor<Pet>(sortBy: [SortDescriptor(\.createdAt)])
-        if let pets = try? sharedContext.fetch(desc) {
-            store.ensureActive(from: pets)
-        }
+        // Note: In previews using Supabase, the DataStore will handle pet fetching
         return store
     }()
+    
+    /// Creates a preview DataStore with sample data
+    static var previewDataStore: DataStore {
+        let store = DataStore.shared
+        // The store will fetch from Supabase when available
+        return store
+    }
 }

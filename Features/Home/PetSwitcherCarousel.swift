@@ -1,16 +1,15 @@
 import SwiftUI
-import SwiftData
 
 /// PRD §5.2 — The pet switcher: avatar(s) in top-left. Single-pet households
 /// render only the active avatar; multi-pet renders a horizontal carousel that
 /// opens on tap.
 struct PetSwitcherCarousel: View {
-    let pets: [Pet]
+    let pets: [PetDTO]
     @EnvironmentObject var petContext: PetContextStore
 
     @State private var expanded = false
 
-    var activePet: Pet? {
+    var activePet: PetDTO? {
         pets.first(where: { $0.id == petContext.activePetID }) ?? pets.first
     }
 
@@ -65,14 +64,19 @@ struct PetSwitcherCarousel: View {
     }
 
     @ViewBuilder
-    private func avatarView(for pet: Pet?, selected: Bool) -> some View {
+    private func avatarView(for pet: PetDTO?, selected: Bool) -> some View {
         ZStack {
-            if let data = pet?.photoData, let ui = UIImage(data: data) {
-                Image(uiImage: ui).resizable().scaledToFill()
+            if let photoURL = pet?.photoURL,
+               let url = URL(string: photoURL) {
+                AsyncImage(url: url) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: {
+                    Color(hex: pet?.accentHex ?? "#2D5F4E")
+                }
             } else {
                 Color(hex: pet?.accentHex ?? "#2D5F4E")
                     .overlay(
-                        Image(systemName: pet?.species.sfSymbol ?? "pawprint.fill")
+                        Image(systemName: Species(rawValue: pet?.speciesRaw ?? "dog")?.sfSymbol ?? "pawprint.fill")
                             .foregroundStyle(Color.white.opacity(0.9))
                             .font(.system(size: 20, weight: .semibold))
                     )
