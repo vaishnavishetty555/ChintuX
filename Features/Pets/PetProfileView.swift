@@ -200,13 +200,7 @@ struct PetProfileView: View {
     }
 
     private var documentsTab: some View {
-        PawlyCard {
-            VStack(alignment: .leading, spacing: Spacing.xs) {
-                Text("Documents").font(PawlyFont.headingMedium)
-                Text("Attach prescriptions, vaccine cards, and adoption papers from each reminder.")
-                    .font(PawlyFont.bodyMedium).foregroundStyle(PawlyColors.slate)
-            }
-        }
+        VaultHomeView(pet: pet)
     }
 
     @ViewBuilder

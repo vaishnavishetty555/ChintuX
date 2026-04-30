@@ -14,7 +14,8 @@ struct PawlyApp: App {
                 Reminder.self,
                 ReminderInstance.self,
                 LogEntry.self,
-                MoodEntry.self
+                MoodEntry.self,
+                PetDocument.self
             ])
             let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
             self.modelContainer = try ModelContainer(for: schema, configurations: config)

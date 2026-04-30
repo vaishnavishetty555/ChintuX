@@ -39,6 +39,15 @@ struct DiscoverView: View {
                             tint: PawlyColors.sage
                         )
                     }.buttonStyle(.plain)
+
+                    NavigationLink(destination: VaultHomeView(pet: nil)) {
+                        DiscoverCard(
+                            title: "Pet Vault",
+                            subtitle: "Encrypted storage for certificates, bills, and travel papers.",
+                            symbol: "lock.shield.fill",
+                            tint: PawlyColors.forest
+                        )
+                    }.buttonStyle(.plain)
                 }
                 .padding(.horizontal, Spacing.screenHorizontal)
                 .padding(.vertical, Spacing.m)

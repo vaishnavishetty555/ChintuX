@@ -10,7 +10,8 @@ enum PreviewSupport {
             Reminder.self,
             ReminderInstance.self,
             LogEntry.self,
-            MoodEntry.self
+            MoodEntry.self,
+            PetDocument.self
         ])
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         do {
