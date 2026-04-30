@@ -4,7 +4,7 @@ import Combine
 
 /// PRD §5.2 — Per-app "which pet am I currently looking at?" state.
 /// Persists last-selected pet id in UserDefaults. Used by Home and Calendar
-/// to drive `@Query` filtering and by the PetSwitcherCarousel to render.
+/// to drive filtering and by the PetSwitcherCarousel to render.
 final class PetContextStore: ObservableObject {
     @Published var activePetID: UUID?
 
@@ -17,7 +17,7 @@ final class PetContextStore: ObservableObject {
         }
     }
 
-    func setActive(_ pet: Pet?) {
+    func setActive(_ pet: PetDTO?) {
         activePetID = pet?.id
         if let id = activePetID {
             UserDefaults.standard.set(id.uuidString, forKey: defaultsKey)
@@ -27,10 +27,10 @@ final class PetContextStore: ObservableObject {
     }
 
     /// Convenience: ensure we have a valid active pet when the full list is known.
-    func ensureActive(from pets: [Pet]) {
-        let activeAndValid = pets.first(where: { $0.id == activePetID && $0.status == .active })
+    func ensureActive(from pets: [PetDTO]) {
+        let activeAndValid = pets.first(where: { $0.id == activePetID && $0.statusRaw == "active" })
         if activeAndValid != nil { return }
-        let firstActive = pets.first(where: { $0.status == .active }) ?? pets.first
+        let firstActive = pets.first(where: { $0.statusRaw == "active" }) ?? pets.first
         setActive(firstActive)
     }
 }

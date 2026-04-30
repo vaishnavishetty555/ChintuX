@@ -1,26 +1,23 @@
 import SwiftUI
-import SwiftData
 
 /// Decides between Onboarding and MainTabView based on whether any active pet exists.
 struct RootView: View {
-    @Query(
-        filter: #Predicate<Pet> { $0.statusRaw == "active" },
-        sort: [SortDescriptor(\Pet.createdAt)]
-    ) private var activePets: [Pet]
-
     @EnvironmentObject private var petContext: PetContextStore
+    @EnvironmentObject private var dataStore: DataStore
     @AppStorage("pawly.onboardingComplete") private var onboardingComplete: Bool = false
 
     var body: some View {
         Group {
-            if !onboardingComplete || activePets.isEmpty {
+            if !onboardingComplete || dataStore.pets.filter({ $0.statusRaw == "active" }).isEmpty {
                 OnboardingCoordinator(onComplete: {
                     onboardingComplete = true
                 })
             } else {
                 MainTabView()
-                    .onAppear { petContext.ensureActive(from: activePets) }
-                    .onChange(of: activePets) { _, newValue in
+                    .onAppear { 
+                        petContext.ensureActive(from: dataStore.pets) 
+                    }
+                    .onChange(of: dataStore.pets) { _, newValue in
                         petContext.ensureActive(from: newValue)
                     }
             }
@@ -31,6 +28,6 @@ struct RootView: View {
 
 #Preview("Root — with seed") {
     RootView()
-        .environmentObject(PreviewSupport.previewPetContext)
-        .modelContainer(PreviewSupport.container)
+        .environmentObject(PetContextStore())
+        .environmentObject(DataStore.shared)
 }

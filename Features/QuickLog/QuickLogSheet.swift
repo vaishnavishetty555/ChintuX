@@ -1,30 +1,25 @@
 import SwiftUI
-import SwiftData
 
 /// PRD §7 Flow 1 — from open to first reminder logged in under 60 seconds, ≤4 taps.
 struct QuickLogSheet: View {
-    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var petContext: PetContextStore
-
-    @Query(
-        filter: #Predicate<Pet> { $0.statusRaw == "active" },
-        sort: [SortDescriptor(\Pet.createdAt)]
-    ) private var pets: [Pet]
+    @EnvironmentObject var dataStore: DataStore
 
     @State private var selectedKind: LogKind = .meal
     @State private var detail: String = ""
     @State private var numericValue: String = ""
 
-    private var activePet: Pet? {
-        pets.first(where: { $0.id == petContext.activePetID }) ?? pets.first
+    private var activePet: PetDTO? {
+        dataStore.pets.first(where: { $0.id == petContext.activePetID && $0.statusRaw == "active" }) 
+            ?? dataStore.pets.first { $0.statusRaw == "active" }
     }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: Spacing.m) {
-                    if pets.count > 1 {
+                    if dataStore.pets.filter({ $0.statusRaw == "active" }).count > 1 {
                         petRow
                     }
 
@@ -55,7 +50,9 @@ struct QuickLogSheet: View {
                     }
 
                     Button {
-                        save()
+                        Task {
+                            await save()
+                        }
                     } label: {
                         Label("Log for \(activePet?.name ?? "pet")", systemImage: "checkmark")
                     }
@@ -81,13 +78,13 @@ struct QuickLogSheet: View {
     private var petRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: Spacing.s) {
-                ForEach(pets) { pet in
+                ForEach(dataStore.pets.filter { $0.statusRaw == "active" }) { pet in
                     Button {
                         petContext.setActive(pet)
                         Haptics.light()
                     } label: {
                         VStack(spacing: 4) {
-                            PetAvatar(pet: pet, size: 44)
+                            PetAvatarDTO(pet: pet, size: 44)
                             Text(pet.name).font(PawlyFont.caption).foregroundStyle(PawlyColors.ink)
                         }
                         .padding(6)
@@ -103,8 +100,9 @@ struct QuickLogSheet: View {
     }
 
     private var lastMedNames: [String] {
-        let recent = (activePet?.logEntries ?? [])
-            .filter { $0.kind == .medication }
+        guard let petId = activePet?.id else { return ["Vitamin drops", "Deworming tablet", "Tick & flea drops"] }
+        let recent = dataStore.logEntries(forPetId: petId)
+            .filter { $0.kindRaw == "medication" }
             .sorted(by: { $0.at > $1.at })
             .prefix(5)
             .map(\.detail)
@@ -139,15 +137,17 @@ struct QuickLogSheet: View {
         }
     }
 
-    private func save() {
+    private func save() async {
         guard let pet = activePet else { return }
         let num = Double(numericValue)
-        let entry = LogEntry(pet: pet, kind: selectedKind, detail: detail, numericValue: num, at: .now)
-        modelContext.insert(entry)
-        if selectedKind == .weight, let num {
-            pet.weightKg = num
-        }
-        try? modelContext.save()
+        
+        await dataStore.createLogEntry(
+            forPetId: pet.id,
+            kind: selectedKind,
+            detail: detail,
+            numericValue: num
+        )
+        
         Haptics.success()
         dismiss()
     }

@@ -1,14 +1,14 @@
 import SwiftUI
-import SwiftData
 
 /// PRD §6.1 — Max 5 screens before Home.
 struct OnboardingCoordinator: View {
     enum Step: Int, CaseIterable { case welcome, basics, profile, reminders, invite }
 
-    @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var petContext: PetContextStore
+    @EnvironmentObject private var dataStore: DataStore
     @StateObject private var draft = OnboardingDraft()
     @State private var step: Step = .welcome
+    @State private var isCreating = false
 
     var onComplete: () -> Void
 
@@ -35,6 +35,14 @@ struct OnboardingCoordinator: View {
         }
         .background(PawlyColors.cream.ignoresSafeArea())
         .environmentObject(draft)
+        .overlay {
+            if isCreating {
+                ProgressView("Creating pet...")
+                    .padding()
+                    .background(RoundedRectangle(cornerRadius: 12).fill(PawlyColors.surface))
+                    .shadow(radius: 10)
+            }
+        }
     }
 
     // MARK: - Navigation
@@ -51,59 +59,48 @@ struct OnboardingCoordinator: View {
     }
 
     private func finish() {
-        let pet = Pet(
-            name: draft.name.trimmingCharacters(in: .whitespaces),
-            species: draft.species,
-            breed: draft.breed.trimmingCharacters(in: .whitespaces),
-            dateOfBirth: draft.hasDateOfBirth ? draft.dateOfBirth : nil,
-            weightKg: Double(draft.weightKg),
-            sex: draft.sex,
-            neutered: draft.neutered,
-            allergiesText: draft.allergies,
-            ongoingConditionsText: draft.conditions,
-            accentHex: PawlyColors.petAccents[0],
-            photoData: draft.photoData
-        )
-        modelContext.insert(pet)
-
-        // Create enabled reminders
-        let cal = Calendar.current
-        let firstDue = cal.date(bySettingHour: 9, minute: 0, second: 0, of: .now) ?? .now
-        for t in draft.firstReminders where t.enabled {
-            let rem = Reminder(
-                pet: pet,
-                title: t.title,
-                type: t.type,
-                recurrence: t.recurrence,
-                firstDueAt: firstDue
+        Task {
+            isCreating = true
+            defer { isCreating = false }
+            
+            // Create pet in Supabase
+            let newPet = await dataStore.createPet(
+                name: draft.name.trimmingCharacters(in: .whitespaces),
+                species: draft.species,
+                breed: draft.breed.trimmingCharacters(in: .whitespaces),
+                dateOfBirth: draft.hasDateOfBirth ? draft.dateOfBirth : nil,
+                sex: draft.sex,
+                accentHex: PawlyColors.petAccents[0]
             )
-            modelContext.insert(rem)
-
-            // Generate instances for the next 120 days
-            let end = cal.date(byAdding: .day, value: 120, to: .now) ?? .now
-            let dates = RecurrenceEngine.occurrences(
-                recurrence: rem.recurrence,
-                firstDueAt: rem.firstDueAt,
-                in: Date().startOfDay..<end
-            )
-            for d in dates {
-                modelContext.insert(ReminderInstance(reminder: rem, scheduledAt: d))
+            
+            // Get the newly created pet
+            if let pet = newPet {
+                petContext.setActive(pet)
+                
+                // Create enabled reminders
+                let cal = Calendar.current
+                let firstDue = cal.date(bySettingHour: 9, minute: 0, second: 0, of: .now) ?? .now
+                
+                for t in draft.firstReminders where t.enabled {
+                    await dataStore.createReminder(
+                        forPetId: pet.id,
+                        title: t.title,
+                        type: t.type,
+                        recurrence: t.recurrence,
+                        firstDueAt: firstDue
+                    )
+                }
+                
+                // Request notification permission (fire-and-forget).
+                Task { _ = await NotificationService.requestAuthorization() }
+                
+                // Only call onComplete after successful creation
+                onComplete()
+            } else {
+                // Handle error - pet creation failed
+                print("Failed to create pet")
             }
         }
-
-        do {
-            try modelContext.save()
-        } catch {
-            // For V1 we simply log — user sees a generic retry in Home if this fails.
-            print("Onboarding save failed: \(error)")
-        }
-
-        petContext.setActive(pet)
-
-        // Request notification permission (fire-and-forget).
-        Task { _ = await NotificationService.requestAuthorization() }
-
-        onComplete()
     }
 }
 
