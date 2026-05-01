@@ -3,6 +3,7 @@ import UserNotifications
 
 @main
 struct PawlyApp: App {
+    @StateObject private var authService = AuthService.shared
     @StateObject private var petContext = PetContextStore()
     @StateObject private var dataStore = DataStore.shared
 
@@ -15,15 +16,11 @@ struct PawlyApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
+                .environmentObject(authService)
                 .environmentObject(petContext)
                 .environmentObject(dataStore)
                 .tint(PawlyColors.forest)
                 .preferredColorScheme(nil)
-                .task {
-                    // Ensure anonymous authentication before fetching data
-                    await SupabaseConfig.ensureAnonymousSession()
-                    await dataStore.fetchAllData()
-                }
         }
     }
 }

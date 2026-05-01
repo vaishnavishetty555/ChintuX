@@ -25,6 +25,18 @@ class DataStore: ObservableObject {
     
     private init() {}
     
+    // MARK: - Clear
+    
+    func clear() {
+        pets = []
+        reminders = []
+        reminderInstances = []
+        logEntries = []
+        moodEntries = []
+        documents = []
+        errorMessage = nil
+    }
+    
     // MARK: - Fetch All Data
     
     func fetchAllData() async {
@@ -70,7 +82,8 @@ class DataStore: ObservableObject {
             breed: breed,
             dateOfBirth: dateOfBirth,
             sexRaw: sex.rawValue,
-            accentHex: accentHex
+            accentHex: accentHex,
+            userId: AuthService.shared.userId
         )
         
         do {

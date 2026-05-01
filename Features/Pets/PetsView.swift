@@ -4,7 +4,9 @@ import SwiftUI
 struct PetsView: View {
     @EnvironmentObject var dataStore: DataStore
     @EnvironmentObject var petContext: PetContextStore
+    @EnvironmentObject var authService: AuthService
     @State private var showingAdd = false
+    @State private var confirmSignOut = false
 
     private var active: [PetDTO] { dataStore.pets.filter { $0.statusRaw == "active" } }
     private var memorial: [PetDTO] { dataStore.pets.filter { $0.statusRaw == "passed" } }
@@ -56,6 +58,18 @@ struct PetsView: View {
             .background(PawlyColors.cream.ignoresSafeArea())
             .navigationTitle("Your pets")
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Menu {
+                        Button(role: .destructive) {
+                            confirmSignOut = true
+                        } label: {
+                            Label("Sign Out", systemImage: "arrow.backward.square")
+                        }
+                    } label: {
+                        Image(systemName: "person.crop.circle")
+                            .tint(PawlyColors.forest)
+                    }
+                }
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         guard active.count < 5 else { return }
@@ -74,6 +88,14 @@ struct PetsView: View {
             }
             .refreshable {
                 await dataStore.fetchAllData()
+            }
+            .alert("Sign Out?", isPresented: $confirmSignOut) {
+                Button("Cancel", role: .cancel) {}
+                Button("Sign Out", role: .destructive) {
+                    Task { await authService.signOut() }
+                }
+            } message: {
+                Text("You'll need to sign in again to access your pets.")
             }
         }
     }

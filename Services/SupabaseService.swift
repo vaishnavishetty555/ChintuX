@@ -8,6 +8,12 @@ class SupabaseService: ObservableObject {
     
     private let client = SupabaseConfig.client
     
+    private static let decoder: JSONDecoder = {
+        let d = JSONDecoder()
+        d.dateDecodingStrategy = .iso8601
+        return d
+    }()
+    
     // MARK: - Pets
     
     func fetchPets() async throws -> [PetDTO] {
@@ -23,7 +29,7 @@ class SupabaseService: ObservableObject {
             .order("created_at", ascending: true)
             .execute()
         
-        return try JSONDecoder().decode([PetDTO].self, from: response.data)
+        return try Self.decoder.decode([PetDTO].self, from: response.data)
     }
     
     func createPet(_ pet: PetDTO) async throws -> PetDTO {
@@ -34,7 +40,7 @@ class SupabaseService: ObservableObject {
             .single()
             .execute()
         
-        return try JSONDecoder().decode(PetDTO.self, from: response.data)
+        return try Self.decoder.decode(PetDTO.self, from: response.data)
     }
     
     func updatePet(_ pet: PetDTO) async throws -> PetDTO {
@@ -46,7 +52,7 @@ class SupabaseService: ObservableObject {
             .single()
             .execute()
         
-        return try JSONDecoder().decode(PetDTO.self, from: response.data)
+        return try Self.decoder.decode(PetDTO.self, from: response.data)
     }
     
     func deletePet(id: UUID) async throws {
@@ -77,7 +83,7 @@ class SupabaseService: ObservableObject {
             .order("first_due_at", ascending: true)
             .execute()
         
-        return try JSONDecoder().decode([ReminderDTO].self, from: response.data)
+        return try Self.decoder.decode([ReminderDTO].self, from: response.data)
     }
     
     func createReminder(_ reminder: ReminderDTO) async throws -> ReminderDTO {
@@ -88,7 +94,7 @@ class SupabaseService: ObservableObject {
             .single()
             .execute()
         
-        return try JSONDecoder().decode(ReminderDTO.self, from: response.data)
+        return try Self.decoder.decode(ReminderDTO.self, from: response.data)
     }
     
     func updateReminder(_ reminder: ReminderDTO) async throws -> ReminderDTO {
@@ -100,7 +106,7 @@ class SupabaseService: ObservableObject {
             .single()
             .execute()
         
-        return try JSONDecoder().decode(ReminderDTO.self, from: response.data)
+        return try Self.decoder.decode(ReminderDTO.self, from: response.data)
     }
     
     func deleteReminder(id: UUID) async throws {
@@ -126,7 +132,7 @@ class SupabaseService: ObservableObject {
             .order("scheduled_at", ascending: true)
             .execute()
         
-        return try JSONDecoder().decode([ReminderInstanceDTO].self, from: response.data)
+        return try Self.decoder.decode([ReminderInstanceDTO].self, from: response.data)
     }
     
     func createReminderInstance(_ instance: ReminderInstanceDTO) async throws -> ReminderInstanceDTO {
@@ -137,7 +143,7 @@ class SupabaseService: ObservableObject {
             .single()
             .execute()
         
-        return try JSONDecoder().decode(ReminderInstanceDTO.self, from: response.data)
+        return try Self.decoder.decode(ReminderInstanceDTO.self, from: response.data)
     }
     
     func updateReminderInstance(_ instance: ReminderInstanceDTO) async throws -> ReminderInstanceDTO {
@@ -149,7 +155,7 @@ class SupabaseService: ObservableObject {
             .single()
             .execute()
         
-        return try JSONDecoder().decode(ReminderInstanceDTO.self, from: response.data)
+        return try Self.decoder.decode(ReminderInstanceDTO.self, from: response.data)
     }
     
     // MARK: - Log Entries
@@ -167,7 +173,7 @@ class SupabaseService: ObservableObject {
             .order("at", ascending: false)
             .execute()
         
-        return try JSONDecoder().decode([LogEntryDTO].self, from: response.data)
+        return try Self.decoder.decode([LogEntryDTO].self, from: response.data)
     }
     
     func createLogEntry(_ entry: LogEntryDTO) async throws -> LogEntryDTO {
@@ -178,7 +184,7 @@ class SupabaseService: ObservableObject {
             .single()
             .execute()
         
-        return try JSONDecoder().decode(LogEntryDTO.self, from: response.data)
+        return try Self.decoder.decode(LogEntryDTO.self, from: response.data)
     }
     
     func deleteLogEntry(id: UUID) async throws {
@@ -204,7 +210,7 @@ class SupabaseService: ObservableObject {
             .order("at", ascending: false)
             .execute()
         
-        return try JSONDecoder().decode([MoodEntryDTO].self, from: response.data)
+        return try Self.decoder.decode([MoodEntryDTO].self, from: response.data)
     }
     
     func createMoodEntry(_ entry: MoodEntryDTO) async throws -> MoodEntryDTO {
@@ -215,7 +221,7 @@ class SupabaseService: ObservableObject {
             .single()
             .execute()
         
-        return try JSONDecoder().decode(MoodEntryDTO.self, from: response.data)
+        return try Self.decoder.decode(MoodEntryDTO.self, from: response.data)
     }
     
     // MARK: - Documents
@@ -236,7 +242,7 @@ class SupabaseService: ObservableObject {
             .order("created_at", ascending: false)
             .execute()
         
-        return try JSONDecoder().decode([PetDocumentDTO].self, from: response.data)
+        return try Self.decoder.decode([PetDocumentDTO].self, from: response.data)
     }
     
     func createDocument(_ document: PetDocumentDTO) async throws -> PetDocumentDTO {
@@ -247,7 +253,7 @@ class SupabaseService: ObservableObject {
             .single()
             .execute()
         
-        return try JSONDecoder().decode(PetDocumentDTO.self, from: response.data)
+        return try Self.decoder.decode(PetDocumentDTO.self, from: response.data)
     }
     
     func deleteDocument(id: UUID) async throws {
