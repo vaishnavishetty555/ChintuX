@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// PRD §6.7 — Pets tab. List, add, switch, Memorial section.
+/// Pets tab — list, add, switch, memorial section.
 struct PetsView: View {
     @EnvironmentObject var dataStore: DataStore
     @EnvironmentObject var petContext: PetContextStore
@@ -101,14 +101,22 @@ struct PetsView: View {
     }
 
     private var header: some View {
-        PawlyCard {
-            VStack(alignment: .leading, spacing: Spacing.xs) {
-                Text("\(active.count) of 5 pets").font(PawlyFont.caption).foregroundStyle(PawlyColors.slate)
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(active.count)/5 pets")
+                    .font(PawlyFont.caption)
+                    .foregroundStyle(PawlyColors.slate)
                 Text("Tap any pet to see their full profile.")
                     .font(PawlyFont.bodyMedium)
-                    .foregroundStyle(PawlyColors.ink)
+                    .foregroundStyle(PawlyColors.slate)
             }
+            Spacer()
         }
+        .padding(Spacing.s)
+        .background(
+            RoundedRectangle(cornerRadius: Radius.small, style: .continuous)
+                .fill(PawlyColors.forestLight)
+        )
     }
 }
 
@@ -119,46 +127,58 @@ struct PetListRowDTO: View {
     @EnvironmentObject var petContext: PetContextStore
 
     var body: some View {
-        PawlyCard {
-            HStack(spacing: Spacing.m) {
-                PetAvatarDTO(pet: pet, size: 56)
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text(pet.name).font(PawlyFont.headingMedium).foregroundStyle(PawlyColors.ink)
-                        if active {
-                            Text("Active")
-                                .font(.system(size: 10, weight: .semibold))
-                                .padding(.horizontal, 8).padding(.vertical, 2)
-                                .background(Capsule().fill(PawlyColors.forest))
-                                .foregroundStyle(.white)
-                        }
-                        if let badge {
-                            Text(badge)
-                                .font(.system(size: 10, weight: .semibold))
-                                .padding(.horizontal, 8).padding(.vertical, 2)
-                                .background(Capsule().fill(PawlyColors.slate.opacity(0.15)))
-                                .foregroundStyle(PawlyColors.slate)
-                        }
+        HStack(spacing: Spacing.m) {
+            PetAvatarDTO(pet: pet, size: 54)
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(pet.name)
+                        .font(PawlyFont.headingMedium)
+                        .foregroundStyle(PawlyColors.ink)
+                    if active {
+                        Text("Active")
+                            .font(.system(size: 10, weight: .semibold))
+                            .padding(.horizontal, 7).padding(.vertical, 2)
+                            .background(Capsule().fill(PawlyColors.forest))
+                            .foregroundStyle(.white)
                     }
-                    Text("\(Species(rawValue: pet.speciesRaw)?.displayName ?? pet.speciesRaw) • \(pet.breed.isEmpty ? "Mixed" : pet.breed) • \(ageDescription)")
-                        .font(PawlyFont.caption)
-                        .foregroundStyle(PawlyColors.slate)
+                    if let badge {
+                        Text(badge)
+                            .font(.system(size: 10, weight: .semibold))
+                            .padding(.horizontal, 7).padding(.vertical, 2)
+                            .background(Capsule().fill(PawlyColors.slate.opacity(0.12)))
+                            .foregroundStyle(PawlyColors.slate)
+                    }
                 }
-                Spacer()
-                Button {
-                    Haptics.medium()
-                    petContext.setActive(pet)
-                } label: {
-                    Image(systemName: active ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 22))
-                        .foregroundStyle(active ? PawlyColors.forest : PawlyColors.slate)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(active ? "Currently active" : "Set as active")
+                Text("\(Species(rawValue: pet.speciesRaw)?.displayName ?? pet.speciesRaw) · \(pet.breed.isEmpty ? "Mixed" : pet.breed) · \(ageDescription)")
+                    .font(PawlyFont.caption)
+                    .foregroundStyle(PawlyColors.slate)
             }
+
+            Spacer()
+
+            Button {
+                Haptics.medium()
+                petContext.setActive(pet)
+            } label: {
+                Image(systemName: active ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 22))
+                    .foregroundStyle(active ? PawlyColors.forest : PawlyColors.sand)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(active ? "Currently active" : "Set as active")
         }
+        .padding(Spacing.m)
+        .background(
+            RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
+                .fill(PawlyColors.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
+                .stroke(active ? PawlyColors.forest.opacity(0.3) : PawlyColors.sand.opacity(0.3), lineWidth: 0.75)
+        )
     }
-    
+
     private var ageDescription: String {
         guard let dob = pet.dateOfBirth else { return "Unknown age" }
         let comps = Calendar.current.dateComponents([.year, .month], from: dob, to: .now)

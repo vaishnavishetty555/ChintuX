@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Themed text-field wrapper for consistent cream/sand styling.
+/// Modern text-field with clean surface, subtle border, and rounded styling.
 struct PawlyTextField: View {
     let label: String
     @Binding var text: String
@@ -10,24 +10,26 @@ struct PawlyTextField: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.xs) {
-            Text(label)
-                .font(PawlyFont.caption)
-                .foregroundStyle(PawlyColors.slate)
+            if !label.isEmpty {
+                Text(label)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(PawlyColors.slate)
+            }
             TextField(placeholder, text: $text)
                 .font(PawlyFont.bodyLarge)
                 .foregroundStyle(PawlyColors.ink)
                 .textInputAutocapitalization(autocapitalization)
                 .keyboardType(keyboard)
-                .padding(.horizontal, Spacing.s)
-                .padding(.vertical, Spacing.s)
-                .frame(minHeight: Spacing.tapTargetMin)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .frame(minHeight: 46)
                 .background(
                     RoundedRectangle(cornerRadius: Radius.input, style: .continuous)
                         .fill(PawlyColors.surface)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: Radius.input, style: .continuous)
-                        .stroke(PawlyColors.sand, lineWidth: 1)
+                        .stroke(PawlyColors.sand.opacity(0.6), lineWidth: 0.75)
                 )
         }
     }

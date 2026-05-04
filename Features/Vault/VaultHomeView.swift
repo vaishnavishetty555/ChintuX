@@ -2,9 +2,7 @@ import SwiftUI
 import SwiftData
 import PhotosUI
 
-/// PRD — Pet Vault home. Lists encrypted documents per-pet or globally.
-/// Free tier caps at 10 documents. Paid unlocks unlimited, OCR search,
-/// expiry reminders, and travel paperwork.
+/// Pet Vault home — encrypted document storage with modern, polished UI.
 struct VaultHomeView: View {
     let pet: Pet?
 
@@ -37,8 +35,18 @@ struct VaultHomeView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Spacing.m) {
-                header
+            VStack(alignment: .leading, spacing: Spacing.l) {
+                // Header
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Pet Vault")
+                        .font(PawlyFont.displayLarge)
+                        .foregroundStyle(PawlyColors.ink)
+                    Text("Secure storage for certificates, bills, and travel papers.")
+                        .font(PawlyFont.bodyMedium)
+                        .foregroundStyle(PawlyColors.slate)
+                }
+                .padding(.horizontal, Spacing.screenHorizontal)
+                .padding(.top, Spacing.m)
 
                 if !subscription.isPaid {
                     tierBanner
@@ -48,12 +56,23 @@ struct VaultHomeView: View {
                     expirySection
                 }
 
-                filterBar
+                // Filter bar
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        FilterChip(title: "All", isSelected: filterType == nil) { filterType = nil }
+                        ForEach(DocumentType.allCases) { type in
+                            FilterChip(title: type.displayName, isSelected: filterType == type) {
+                                filterType = type
+                            }
+                        }
+                    }
+                    .padding(.horizontal, Spacing.screenHorizontal)
+                }
 
                 documentList
+
+                Spacer(minLength: Spacing.xxl)
             }
-            .padding(.horizontal, Spacing.screenHorizontal)
-            .padding(.vertical, Spacing.m)
         }
         .background(PawlyColors.cream.ignoresSafeArea())
         .navigationTitle(pet?.name != nil ? "\(pet!.name)'s Vault" : "Pet Vault")
@@ -106,90 +125,86 @@ struct VaultHomeView: View {
         }
     }
 
-    // MARK: - Header
-
-    private var header: some View {
-        VStack(alignment: .leading, spacing: Spacing.xs) {
-            Text("The Pet Vault")
-                .font(PawlyFont.displayMedium)
-                .foregroundStyle(PawlyColors.ink)
-            Text("Secure storage for certificates, bills, and travel papers.")
-                .font(PawlyFont.bodyMedium)
-                .foregroundStyle(PawlyColors.slate)
-        }
-    }
-
-    // MARK: - Tier banner
+    // MARK: - Tier Banner
 
     private var tierBanner: some View {
-        PawlyCard {
-            VStack(alignment: .leading, spacing: Spacing.xs) {
-                HStack {
-                    Image(systemName: "lock.shield.fill")
-                        .foregroundStyle(PawlyColors.peach)
-                    Text("Free plan")
-                        .font(PawlyFont.headingMedium)
-                        .foregroundStyle(PawlyColors.ink)
-                    Spacer()
-                    Text("\(allDocuments.count)/\(SubscriptionStore.freeDocumentLimit)")
-                        .font(PawlyFont.caption)
-                        .foregroundStyle(PawlyColors.slate)
-                }
-                ProgressView(value: Double(min(allDocuments.count, SubscriptionStore.freeDocumentLimit)),
-                             total: Double(SubscriptionStore.freeDocumentLimit))
-                .tint(PawlyColors.forest)
-                Text("Upgrade for unlimited storage, OCR search, expiry reminders, and travel paperwork.")
+        VStack(alignment: .leading, spacing: Spacing.xs) {
+            HStack {
+                Image(systemName: "lock.shield.fill")
+                    .foregroundStyle(PawlyColors.peach)
+                Text("Free plan")
+                    .font(PawlyFont.headingMedium)
+                    .foregroundStyle(PawlyColors.ink)
+                Spacer()
+                Text("\(allDocuments.count)/\(SubscriptionStore.freeDocumentLimit)")
                     .font(PawlyFont.caption)
                     .foregroundStyle(PawlyColors.slate)
-                Button("Upgrade") { showingPaywall = true }
-                    .buttonStyle(.pawlyPrimary)
             }
+            ProgressView(value: Double(min(allDocuments.count, SubscriptionStore.freeDocumentLimit)),
+                         total: Double(SubscriptionStore.freeDocumentLimit))
+                .tint(PawlyColors.forest)
+            Text("Upgrade for unlimited storage, OCR search, and travel paperwork.")
+                .font(PawlyFont.caption)
+                .foregroundStyle(PawlyColors.slate)
+            Button("Upgrade") { showingPaywall = true }
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: Radius.chip, style: .continuous)
+                        .fill(PawlyColors.forest)
+                )
+                .padding(.top, 4)
         }
+        .padding(Spacing.m)
+        .background(
+            RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
+                .fill(PawlyColors.peachLight)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
+                .stroke(PawlyColors.peach.opacity(0.3), lineWidth: 0.75)
+        )
+        .padding(.horizontal, Spacing.screenHorizontal)
     }
 
-    // MARK: - Expiry section
+    // MARK: - Expiry Section
 
     private var expirySection: some View {
         VStack(alignment: .leading, spacing: Spacing.s) {
-            Text("Expiring soon")
-                .font(PawlyFont.headingMedium)
-                .foregroundStyle(PawlyColors.alert)
+            HStack(spacing: 6) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(PawlyColors.alert)
+                Text("Expiring soon")
+                    .font(PawlyFont.headingMedium)
+                    .foregroundStyle(PawlyColors.alert)
+            }
+            .padding(.horizontal, Spacing.screenHorizontal)
+
             ForEach(expiringSoon) { doc in
                 Button { selectedDocument = doc } label: {
                     ExpiryRow(document: doc)
                 }
                 .buttonStyle(.plain)
+                .padding(.horizontal, Spacing.screenHorizontal)
             }
         }
     }
 
-    // MARK: - Filter bar
-
-    private var filterBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                FilterChip(title: "All", isSelected: filterType == nil) {
-                    filterType = nil
-                }
-                ForEach(DocumentType.allCases) { type in
-                    FilterChip(title: type.displayName, isSelected: filterType == type) {
-                        filterType = type
-                    }
-                }
-            }
-        }
-    }
-
-    // MARK: - Document list
+    // MARK: - Document List
 
     @ViewBuilder
     private var documentList: some View {
         if documents.isEmpty {
-            PawlyCard {
-                VStack(spacing: Spacing.s) {
+            VStack(spacing: Spacing.m) {
+                ZStack {
+                    Circle().fill(PawlyColors.forestLight).frame(width: 72, height: 72)
                     Image(systemName: "doc.text.fill")
-                        .font(.system(size: 40))
+                        .font(.system(size: 28))
                         .foregroundStyle(PawlyColors.forest)
+                }
+                VStack(spacing: 4) {
                     Text("No documents yet")
                         .font(PawlyFont.headingMedium)
                         .foregroundStyle(PawlyColors.ink)
@@ -197,96 +212,120 @@ struct VaultHomeView: View {
                         .font(PawlyFont.bodyMedium)
                         .foregroundStyle(PawlyColors.slate)
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, Spacing.xl)
             }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, Spacing.xl)
         } else {
             ForEach(documents) { doc in
                 Button { selectedDocument = doc } label: {
                     DocumentRow(document: doc)
                 }
                 .buttonStyle(.plain)
+                .padding(.horizontal, Spacing.screenHorizontal)
             }
         }
     }
 }
 
-// MARK: - Row views
+// MARK: - Document Row
 
 private struct DocumentRow: View {
     let document: PetDocument
 
     var body: some View {
-        PawlyCard {
-            HStack(spacing: Spacing.m) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: Radius.card)
-                        .fill(PawlyColors.cream)
-                    if let thumb = document.thumbnailData, let ui = UIImage(data: thumb) {
-                        Image(uiImage: ui)
-                            .resizable()
-                            .scaledToFill()
-                            .clipShape(RoundedRectangle(cornerRadius: Radius.card))
-                    } else {
-                        Image(systemName: document.documentType.sfSymbol)
-                            .font(.system(size: 22))
-                            .foregroundStyle(PawlyColors.forest)
-                    }
+        HStack(spacing: Spacing.m) {
+            // Thumbnail
+            ZStack {
+                RoundedRectangle(cornerRadius: Radius.small)
+                    .fill(PawlyColors.forestLight)
+                    .frame(width: 48, height: 48)
+                if let thumb = document.thumbnailData, let ui = UIImage(data: thumb) {
+                    Image(uiImage: ui)
+                        .resizable().scaledToFill()
+                        .clipShape(RoundedRectangle(cornerRadius: Radius.small))
+                } else {
+                    Image(systemName: document.documentType.sfSymbol)
+                        .font(.system(size: 20))
+                        .foregroundStyle(PawlyColors.forest)
                 }
-                .frame(width: 56, height: 56)
-                .clipped()
+            }
 
-                VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack {
                     Text(document.title)
                         .font(PawlyFont.bodyLarge)
                         .foregroundStyle(PawlyColors.ink)
-                    Text(document.documentType.displayName)
-                        .font(PawlyFont.caption)
-                        .foregroundStyle(PawlyColors.slate)
-                    if let days = document.daysUntilExpiry {
-                        let label = days < 0 ? "Expired \(abs(days))d ago" : "Expires in \(days)d"
-                        Text(label)
-                            .font(PawlyFont.captionSmall)
-                            .foregroundStyle(days < 0 ? PawlyColors.alert : PawlyColors.peach)
+                    if document.isFavorite {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 11))
+                            .foregroundStyle(PawlyColors.peach)
                     }
                 }
-                Spacer()
-                if document.isFavorite {
-                    Image(systemName: "star.fill")
-                        .foregroundStyle(PawlyColors.peach)
-                }
-                Image(systemName: "chevron.right")
+                Text(document.documentType.displayName)
+                    .font(PawlyFont.caption)
                     .foregroundStyle(PawlyColors.slate)
+                if let days = document.daysUntilExpiry {
+                    let label = days < 0 ? "Expired \(abs(days))d ago" : "Expires in \(days)d"
+                    Text(label)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(days < 0 ? PawlyColors.alert : PawlyColors.peach)
+                }
             }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(PawlyColors.sand)
         }
+        .padding(Spacing.m)
+        .background(
+            RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
+                .fill(PawlyColors.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
+                .stroke(PawlyColors.sand.opacity(0.4), lineWidth: 0.75)
+        )
     }
 }
+
+// MARK: - Expiry Row
 
 private struct ExpiryRow: View {
     let document: PetDocument
 
     var body: some View {
-        PawlyCard {
-            HStack(spacing: Spacing.m) {
-                Image(systemName: document.documentType.sfSymbol)
-                    .foregroundStyle(PawlyColors.alert)
-                    .frame(width: 40, height: 40)
-                    .background(Circle().fill(PawlyColors.alert.opacity(0.12)))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(document.title)
-                        .font(PawlyFont.bodyMedium)
-                        .foregroundStyle(PawlyColors.ink)
-                    if let days = document.daysUntilExpiry {
-                        Text(days < 0 ? "Expired \(abs(days)) days ago" : "Expires in \(days) days")
-                            .font(PawlyFont.captionSmall)
-                            .foregroundStyle(PawlyColors.alert)
-                    }
+        HStack(spacing: Spacing.m) {
+            Image(systemName: document.documentType.sfSymbol)
+                .foregroundStyle(PawlyColors.alert)
+                .frame(width: 36, height: 36)
+                .background(Circle().fill(PawlyColors.alert.opacity(0.12)))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(document.title)
+                    .font(PawlyFont.bodyMedium)
+                    .foregroundStyle(PawlyColors.ink)
+                if let days = document.daysUntilExpiry {
+                    Text(days < 0 ? "Expired \(abs(days)) days ago" : "Expires in \(days) days")
+                        .font(PawlyFont.captionSmall)
+                        .foregroundStyle(PawlyColors.alert)
                 }
-                Spacer()
             }
+            Spacer()
         }
+        .padding(Spacing.s)
+        .background(
+            RoundedRectangle(cornerRadius: Radius.small, style: .continuous)
+                .fill(PawlyColors.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Radius.small, style: .continuous)
+                .stroke(PawlyColors.alert.opacity(0.2), lineWidth: 0.75)
+        )
     }
 }
+
+// MARK: - Filter Chip
 
 private struct FilterChip: View {
     let title: String
@@ -296,12 +335,16 @@ private struct FilterChip: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(PawlyFont.caption)
-                .padding(.horizontal, Spacing.s)
+                .font(.system(size: 11, weight: .semibold))
+                .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(Capsule().fill(isSelected ? PawlyColors.forest : PawlyColors.surface))
+                .background(
+                    Capsule().fill(isSelected ? PawlyColors.forest : PawlyColors.surface)
+                )
+                .overlay(
+                    Capsule().stroke(isSelected ? PawlyColors.forest : PawlyColors.sand.opacity(0.5), lineWidth: 0.75)
+                )
                 .foregroundStyle(isSelected ? .white : PawlyColors.ink)
-                .overlay(Capsule().stroke(PawlyColors.sand, lineWidth: 1))
         }
         .buttonStyle(.plain)
     }

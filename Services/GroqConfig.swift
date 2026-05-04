@@ -5,7 +5,7 @@ import Foundation
 /// Add your key locally after cloning. In production, use a backend proxy
 /// or the iOS Keychain.
 enum GroqConfig {
-    static let apiKey = ""
+    static let apiKey = "YOUR_GROQ_API_KEY"
     static let baseURL = URL(string: "https://api.groq.com/openai/v1")!
     static let chatEndpoint = baseURL.appendingPathComponent("chat/completions")
 

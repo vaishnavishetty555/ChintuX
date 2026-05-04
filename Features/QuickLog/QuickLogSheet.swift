@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// PRD §7 Flow 1 — from open to first reminder logged in under 60 seconds, ≤4 taps.
+/// Quick Log sheet — PRD §7 Flow 1. ≤4 taps from open to first reminder logged.
+/// Modern bottom-sheet design with clean type selector and contextual forms.
 struct QuickLogSheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var petContext: PetContextStore
@@ -11,29 +12,31 @@ struct QuickLogSheet: View {
     @State private var numericValue: String = ""
 
     private var activePet: PetDTO? {
-        dataStore.pets.first(where: { $0.id == petContext.activePetID && $0.statusRaw == "active" }) 
+        dataStore.pets.first(where: { $0.id == petContext.activePetID && $0.statusRaw == "active" })
             ?? dataStore.pets.first { $0.statusRaw == "active" }
     }
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: Spacing.m) {
+                VStack(alignment: .leading, spacing: Spacing.l) {
+                    // Pet selector (if multiple pets)
                     if dataStore.pets.filter({ $0.statusRaw == "active" }).count > 1 {
                         petRow
                     }
 
-                    // Kind selector
+                    // Kind selector — large tappable chips
                     HStack(spacing: Spacing.xs) {
                         ForEach(LogKind.allCases) { k in
                             KindChip(kind: k, selected: selectedKind == k) {
                                 Haptics.light()
                                 selectedKind = k
+                                detail = ""
                             }
                         }
                     }
 
-                    // Dynamic form per kind
+                    // Dynamic form
                     switch selectedKind {
                     case .meal:
                         quickPicker(options: ["Dry food", "Wet food", "Home-cooked", "Treats"])
@@ -42,17 +45,22 @@ struct QuickLogSheet: View {
                         quickPicker(options: lastMedNames)
                         PawlyTextField(label: "Dosage / notes", text: $detail, placeholder: "1 tablet")
                     case .walk:
-                        PawlyTextField(label: "Duration / notes", text: $detail, placeholder: "15 min balcony")
+                        PawlyTextField(label: "Duration / notes", text: $detail, placeholder: "15 min walk")
                     case .weight:
-                        PawlyTextField(label: "Weight (kg)", text: $numericValue, placeholder: "4.2", keyboard: .decimalPad, autocapitalization: .never)
+                        PawlyTextField(
+                            label: "Weight (kg)",
+                            text: $numericValue,
+                            placeholder: "4.2",
+                            keyboard: .decimalPad,
+                            autocapitalization: .never
+                        )
                     case .hygiene:
                         quickPicker(options: ["Brushing", "Nail trim", "Ear clean", "Bath"])
                     }
 
+                    // Save button
                     Button {
-                        Task {
-                            await save()
-                        }
+                        Task { await save() }
                     } label: {
                         Label("Log for \(activePet?.name ?? "pet")", systemImage: "checkmark")
                     }
@@ -70,10 +78,13 @@ struct QuickLogSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .foregroundStyle(PawlyColors.slate)
                 }
             }
         }
     }
+
+    // MARK: - Pet Row
 
     private var petRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -83,14 +94,24 @@ struct QuickLogSheet: View {
                         petContext.setActive(pet)
                         Haptics.light()
                     } label: {
-                        VStack(spacing: 4) {
+                        VStack(spacing: 5) {
                             PetAvatarDTO(pet: pet, size: 44)
-                            Text(pet.name).font(PawlyFont.caption).foregroundStyle(PawlyColors.ink)
+                            Text(pet.name)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(PawlyColors.ink)
                         }
                         .padding(6)
                         .background(
-                            RoundedRectangle(cornerRadius: Radius.card)
-                                .fill(pet.id == activePet?.id ? Color(hex: pet.accentHex).opacity(0.15) : .clear)
+                            RoundedRectangle(cornerRadius: Radius.small)
+                                .fill(pet.id == activePet?.id
+                                      ? Color(hex: pet.accentHex).opacity(0.15)
+                                      : .clear)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Radius.small)
+                                .stroke(pet.id == activePet?.id
+                                        ? Color(hex: pet.accentHex)
+                                        : Color.clear, lineWidth: 1.5)
                         )
                     }
                     .buttonStyle(.plain)
@@ -99,8 +120,12 @@ struct QuickLogSheet: View {
         }
     }
 
+    // MARK: - Quick Picker
+
     private var lastMedNames: [String] {
-        guard let petId = activePet?.id else { return ["Vitamin drops", "Deworming tablet", "Tick & flea drops"] }
+        guard let petId = activePet?.id else {
+            return ["Vitamin drops", "Deworming tablet", "Tick & flea drops"]
+        }
         let recent = dataStore.logEntries(forPetId: petId)
             .filter { $0.kindRaw == "medication" }
             .sorted(by: { $0.at > $1.at })
@@ -108,8 +133,7 @@ struct QuickLogSheet: View {
             .map(\.detail)
             .filter { !$0.isEmpty }
         let defaults = ["Vitamin drops", "Deworming tablet", "Tick & flea drops"]
-        let combined = Array(Set(recent + defaults))
-        return combined.sorted()
+        return Array(Set(recent + defaults)).sorted()
     }
 
     @ViewBuilder
@@ -122,14 +146,19 @@ struct QuickLogSheet: View {
                         Haptics.light()
                     } label: {
                         Text(opt)
-                            .font(PawlyFont.caption)
-                            .padding(.horizontal, Spacing.s)
+                            .font(.system(size: 12, weight: .medium))
+                            .padding(.horizontal, 14)
                             .padding(.vertical, 8)
-                            .background(Capsule().fill(
-                                detail == opt ? PawlyColors.forest : PawlyColors.surface
-                            ))
-                            .foregroundStyle(detail == opt ? Color.white : PawlyColors.ink)
-                            .overlay(Capsule().stroke(PawlyColors.sand, lineWidth: 1))
+                            .background(
+                                Capsule().fill(detail == opt ? PawlyColors.forest : PawlyColors.surface)
+                            )
+                            .overlay(
+                                Capsule().stroke(
+                                    detail == opt ? PawlyColors.forest : PawlyColors.sand.opacity(0.5),
+                                    lineWidth: 0.75
+                                )
+                            )
+                            .foregroundStyle(detail == opt ? .white : PawlyColors.ink)
                     }
                     .buttonStyle(.plain)
                 }
@@ -137,44 +166,50 @@ struct QuickLogSheet: View {
         }
     }
 
+    // MARK: - Save
+
     private func save() async {
         guard let pet = activePet else { return }
         let num = Double(numericValue)
-        
+
         await dataStore.createLogEntry(
             forPetId: pet.id,
             kind: selectedKind,
             detail: detail,
             numericValue: num
         )
-        
+
         Haptics.success()
         dismiss()
     }
 }
 
+// MARK: - Kind Chip
+
 private struct KindChip: View {
     let kind: LogKind
     let selected: Bool
     var onTap: () -> Void
+
     var body: some View {
         Button(action: onTap) {
-            VStack(spacing: 4) {
+            VStack(spacing: 5) {
                 Image(systemName: kind.sfSymbol)
                     .font(.system(size: 18, weight: selected ? .semibold : .regular))
-                Text(kind.displayName).font(PawlyFont.caption)
+                Text(kind.displayName)
+                    .font(.system(size: 10, weight: .semibold))
             }
-            .frame(maxWidth: .infinity, minHeight: 64)
-            .foregroundStyle(selected ? Color.white : PawlyColors.ink)
+            .frame(maxWidth: .infinity, minHeight: 62)
+            .foregroundStyle(selected ? .white : PawlyColors.ink)
             .background(
-                RoundedRectangle(cornerRadius: Radius.card)
+                RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
                     .fill(selected ? PawlyColors.forest : PawlyColors.surface)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: Radius.card).stroke(PawlyColors.sand, lineWidth: 1)
+                RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
+                    .stroke(selected ? PawlyColors.forest : PawlyColors.sand.opacity(0.4), lineWidth: 0.75)
             )
         }
         .buttonStyle(.plain)
-        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }

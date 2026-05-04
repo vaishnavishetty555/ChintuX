@@ -1,9 +1,7 @@
 import SwiftUI
-import SwiftData
 
-/// PRD §5.1 — Five tabs. The middle slot is a center "Add" FAB that presents
-/// the Quick Log sheet. SwiftUI's TabView doesn't natively support a FAB in
-/// the middle so we render a custom bottom bar overlay.
+/// Five tabs. Center slot is the Quick Log FAB. Modern floating tab bar design
+/// with glass-like surface and subtle shadow. No harsh borders.
 struct MainTabView: View {
     enum Tab: Hashable { case home, calendar, discover, pets }
 
@@ -23,16 +21,13 @@ struct MainTabView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(PawlyColors.cream.ignoresSafeArea())
-            // Pad bottom so content doesn't hide behind the custom tab bar.
+            // Pad bottom to avoid content under tab bar
             .safeAreaInset(edge: .bottom) {
-                Color.clear.frame(height: 76)
+                Color.clear.frame(height: 84)
             }
 
-            // Custom tab bar with center FAB.
-            PawlyTabBar(
-                selected: $selected,
-                onAddTap: { showingQuickLog = true }
-            )
+            // Custom floating tab bar
+            PawlyTabBar(selected: $selected, onAddTap: { showingQuickLog = true })
         }
         .sheet(isPresented: $showingQuickLog) {
             QuickLogSheet()
@@ -42,52 +37,59 @@ struct MainTabView: View {
     }
 }
 
+// MARK: - Tab Bar
+
 struct PawlyTabBar: View {
     @Binding var selected: MainTabView.Tab
     var onAddTap: () -> Void
 
     var body: some View {
         HStack(spacing: 0) {
-            tab(.home,     symbol: "house.fill",     label: "Home")
-            tab(.calendar, symbol: "calendar",       label: "Calendar")
+            tab(.home,      symbol: "house.fill",    label: "Home")
+            tab(.calendar,  symbol: "calendar",      label: "Calendar")
             addButton
-            tab(.discover, symbol: "sparkles",       label: "Discover")
-            tab(.pets,     symbol: "pawprint.fill",  label: "Pets")
+            tab(.discover,  symbol: "sparkles",      label: "Discover")
+            tab(.pets,      symbol: "pawprint.fill", label: "Pets")
         }
-        .padding(.horizontal, Spacing.s)
+        .padding(.horizontal, Spacing.xs)
         .padding(.top, Spacing.xs)
-        .padding(.bottom, Spacing.xs)
-        .frame(height: 76)
+        .padding(.bottom, 20)
+        .frame(height: 72)
         .background(
-            PawlyColors.surface
-                .overlay(
-                    Rectangle()
-                        .fill(PawlyColors.sand)
-                        .frame(height: 0.5),
-                    alignment: .top
-                )
-                .ignoresSafeArea(edges: .bottom)
+            .ultraThinMaterial
         )
+        .overlay(
+            Rectangle()
+                .fill(PawlyColors.sand.opacity(0.3))
+                .frame(height: 0.5),
+            alignment: .top
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radius.button, style: .continuous))
+        .shadow(color: Color.black.opacity(0.08), radius: 16, x: 0, y: 4)
+        .padding(.horizontal, 16)
     }
 
     @ViewBuilder
     private func tab(_ tab: MainTabView.Tab, symbol: String, label: String) -> some View {
+        let isSelected = selected == tab
         Button {
             Haptics.light()
-            withAnimation(Motion.micro) { selected = tab }
+            withAnimation(.easeInOut(duration: 0.2)) { selected = tab }
         } label: {
-            VStack(spacing: 3) {
+            VStack(spacing: 4) {
                 Image(systemName: symbol)
-                    .font(.system(size: 20, weight: selected == tab ? .semibold : .regular))
-                Text(label).font(PawlyFont.captionSmall)
+                    .font(.system(size: 20, weight: isSelected ? .semibold : .regular))
+                    .foregroundStyle(isSelected ? PawlyColors.forest : PawlyColors.slate)
+                Text(label)
+                    .font(.system(size: 10, weight: isSelected ? .semibold : .medium))
+                    .foregroundStyle(isSelected ? PawlyColors.forest : PawlyColors.slate)
             }
-            .frame(maxWidth: .infinity, minHeight: Spacing.tapTargetMin)
-            .foregroundStyle(selected == tab ? PawlyColors.forest : PawlyColors.slate)
+            .frame(maxWidth: .infinity, minHeight: 44)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
-        .accessibilityAddTraits(selected == tab ? .isSelected : [])
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private var addButton: some View {
@@ -96,15 +98,17 @@ struct PawlyTabBar: View {
             onAddTap()
         } label: {
             ZStack {
-                Circle().fill(PawlyColors.forest)
-                    .frame(width: 56, height: 56)
-                    .shadow(color: PawlyColors.forest.opacity(0.25), radius: 10, x: 0, y: 4)
+                Circle()
+                    .fill(PawlyColors.forest)
+                    .frame(width: 52, height: 52)
+                    .shadow(color: PawlyColors.forest.opacity(0.35), radius: 10, x: 0, y: 5)
                 Image(systemName: "plus")
                     .font(.system(size: 22, weight: .bold))
-                    .foregroundStyle(Color.white)
+                    .foregroundStyle(.white)
+                    .offset(y: -1)
             }
             .frame(width: 64, height: 64)
-            .offset(y: -12) // lifts above the bar
+            .offset(y: -14)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Add log entry")

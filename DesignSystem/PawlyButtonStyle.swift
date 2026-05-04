@@ -6,43 +6,44 @@ struct PawlyPrimaryButtonStyle: ButtonStyle {
     var expands: Bool = true
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(PawlyFont.headingMedium)
-            .foregroundStyle(Color.white)
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 22)
             .padding(.vertical, 14)
-            .padding(.horizontal, 24)
-            .frame(minHeight: Spacing.tapTargetMin)
+            .frame(minHeight: 48)
             .frame(maxWidth: expands ? .infinity : nil)
             .background(
                 RoundedRectangle(cornerRadius: Radius.button, style: .continuous)
                     .fill(PawlyColors.forest)
                     .opacity(configuration.isPressed ? 0.85 : 1.0)
             )
+            .shadow(color: configuration.isPressed ? Color.clear : PawlyColors.forest.opacity(0.25), radius: 8, x: 0, y: 3)
             .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
-            .animation(Motion.micro, value: configuration.isPressed)
+            .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
     }
 }
 
-// MARK: - Secondary (outlined forest)
+// MARK: - Secondary (outlined)
 
 struct PawlySecondaryButtonStyle: ButtonStyle {
     var expands: Bool = true
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(PawlyFont.headingMedium)
+            .font(.system(size: 15, weight: .semibold))
             .foregroundStyle(PawlyColors.forest)
+            .padding(.horizontal, 22)
             .padding(.vertical, 14)
-            .padding(.horizontal, 24)
-            .frame(minHeight: Spacing.tapTargetMin)
+            .frame(minHeight: 48)
             .frame(maxWidth: expands ? .infinity : nil)
             .background(
                 RoundedRectangle(cornerRadius: Radius.button, style: .continuous)
                     .stroke(PawlyColors.forest, lineWidth: 1.5)
                     .background(
                         RoundedRectangle(cornerRadius: Radius.button, style: .continuous)
-                            .fill(PawlyColors.surface.opacity(configuration.isPressed ? 0.6 : 0.0))
+                            .fill(PawlyColors.surface.opacity(configuration.isPressed ? 0.8 : 0.0))
                     )
             )
-            .animation(Motion.micro, value: configuration.isPressed)
+            .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
     }
 }
 
@@ -52,17 +53,17 @@ struct PawlyDestructiveButtonStyle: ButtonStyle {
     var expands: Bool = true
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(PawlyFont.headingMedium)
+            .font(.system(size: 15, weight: .semibold))
             .foregroundStyle(PawlyColors.alert)
+            .padding(.horizontal, 22)
             .padding(.vertical, 14)
-            .padding(.horizontal, 24)
-            .frame(minHeight: Spacing.tapTargetMin)
+            .frame(minHeight: 48)
             .frame(maxWidth: expands ? .infinity : nil)
             .background(
                 RoundedRectangle(cornerRadius: Radius.button, style: .continuous)
                     .fill(PawlyColors.alert.opacity(configuration.isPressed ? 0.15 : 0.08))
             )
-            .animation(Motion.micro, value: configuration.isPressed)
+            .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
     }
 }
 

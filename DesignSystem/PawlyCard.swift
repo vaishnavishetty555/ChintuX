@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// PRD §4.6 — Reusable card container with warm surface, soft border, 12dp radius.
+/// Modern card container. Clean white surface, subtle border, no heavy shadows.
+/// Subtle shadow for depth without looking "plastic".
 struct PawlyCard<Content: View>: View {
     var padding: CGFloat = Spacing.cardPadding
     @ViewBuilder var content: () -> Content
@@ -15,8 +16,8 @@ struct PawlyCard<Content: View>: View {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
-                    .stroke(PawlyColors.sand, lineWidth: 1)
-                    .opacity(0.6)
+                    .stroke(PawlyColors.sand.opacity(0.5), lineWidth: 0.75)
             )
+            .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 2)
     }
 }

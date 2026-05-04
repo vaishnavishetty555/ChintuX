@@ -1,32 +1,48 @@
 import SwiftUI
 
-/// PRD §4.1 — Earthy, considered palette. Tokens mapped to asset-catalog colors
-/// that automatically adapt to light/dark mode.
+/// Modern, sophisticated palette. Earthy but refined — avoids AI slop aesthetic.
 enum PawlyColors {
-    static let forest  = Color("BrandForest")   // Primary
-    static let peach   = Color("BrandPeach")    // Accent
-    static let cream   = Color("BrandCream")    // Background
-    static let surface = Color("BrandSurface")  // Card surface
-    static let sand    = Color("BrandSand")     // Border / divider
-    static let ink     = Color("BrandInk")      // Text primary
-    static let slate   = Color("BrandSlate")    // Text secondary
-    static let alert   = Color("BrandAlert")    // Warning
-    static let sage    = Color("BrandSage")     // Success
+    // Primary
+    static let forest  = Color("BrandForest")   // Deep forest green
+    static let forestLight = Color("BrandForest").opacity(0.12)
 
-    /// Accent palette for per-pet color coding (PRD §6.7). Hex strings.
+    // Accent
+    static let peach   = Color("BrandPeach")    // Warm peach/amber
+    static let peachLight = Color("BrandPeach").opacity(0.15)
+
+    // Backgrounds
+    static let cream   = Color("BrandCream")    // Warm off-white
+    static let surface = Color("BrandSurface")  // Card surface (white-ish)
+
+    // Borders / Dividers
+    static let sand    = Color("BrandSand")     // Subtle warm border
+
+    // Text
+    static let ink     = Color("BrandInk")      // Near-black text
+    static let slate   = Color("BrandSlate")    // Secondary text
+
+    // Status
+    static let alert   = Color("BrandAlert")    // Red-orange warning
+    static let sage    = Color("BrandSage")     // Soft green success
+
+    // Subtle overlay for glass effects
+    static let overlayLight = Color.white.opacity(0.7)
+    static let shadowColor = Color.black.opacity(0.06)
+
+    /// Accent palette for per-pet color coding. Hex strings.
     static let petAccents: [String] = [
-        "#2D5F4E", // forest
-        "#E8A87C", // peach
-        "#8FB29A", // sage
-        "#C84A3F", // warm terracotta (alert tone)
-        "#6B8CAE", // muted slate-blue
-        "#B68A6A", // clay
+        "#2D5F4E", // forest green
+        "#E8A87C", // warm peach
+        "#8FB29A", // sage green
+        "#C84A3F", // terracotta
+        "#6B8CAE", // slate blue
+        "#B68A6A", // clay brown
         "#9B7FB3"  // muted plum
     ]
 }
 
 extension Color {
-    /// Parses "#RRGGBB" or "RRGGBB" hex strings; falls back to forest on failure.
+    /// Parses "#RRGGBB" or "RRGGBB" hex strings.
     init(hex: String) {
         var h = hex.trimmingCharacters(in: .whitespacesAndNewlines)
         if h.hasPrefix("#") { h.removeFirst() }

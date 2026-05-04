@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// PRD §6.2 — Home tab. Top-to-bottom composition.
+/// Home tab — top-to-bottom composition with clear visual hierarchy.
+/// Hero pet section → today's care → up next → discover nudge.
 struct HomeView: View {
     @EnvironmentObject var petContext: PetContextStore
     @EnvironmentObject var dataStore: DataStore
@@ -11,144 +12,66 @@ struct HomeView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Spacing.m) {
-                // Pet switcher + greeting row
+            VStack(alignment: .leading, spacing: 0) {
+                // ── Header row ──────────────────────────────────
                 HStack(alignment: .center) {
                     PetSwitcherCarousel(pets: dataStore.pets)
                     Spacer()
-                    VStack(alignment: .trailing, spacing: 0) {
-                        Text("Today").font(PawlyFont.caption).foregroundStyle(PawlyColors.slate)
-                        Text(Date(), format: .dateTime.weekday(.wide).day().month(.abbreviated))
-                            .font(PawlyFont.headingMedium)
-                            .foregroundStyle(PawlyColors.ink)
-                    }
+                    dateBlock
                 }
+                .padding(.horizontal, Spacing.screenHorizontal)
+                .padding(.top, Spacing.m)
+                .padding(.bottom, Spacing.l)
 
                 if let pet = activePet {
-                    PetHeaderCard(pet: pet)
-                    TodaySummaryCard(pet: pet)
-                    UpNextCard(pet: pet)
-                    DailyCareCard(pet: pet)
-                    DiscoverPromptCard(pet: pet)
+                    // ── Pet hero card ──────────────────────────
+                    PetHeroCard(pet: pet)
+                        .padding(.horizontal, Spacing.screenHorizontal)
+                        .padding(.bottom, Spacing.l)
+
+                    // ── Today's care ──────────────────────────
+                    TodayCareSection(pet: pet)
+                        .padding(.horizontal, Spacing.screenHorizontal)
+                        .padding(.bottom, Spacing.l)
+
+                    // ── Up next ────────────────────────────────
+                    UpNextSection(pet: pet)
+                        .padding(.horizontal, Spacing.screenHorizontal)
+                        .padding(.bottom, Spacing.l)
+
+                    // ── Discover nudge ────────────────────────
+                    DiscoverNudgeCard(pet: pet)
+                        .padding(.horizontal, Spacing.screenHorizontal)
+                        .padding(.bottom, Spacing.xxl)
+
                 } else {
                     EmptyPetsState()
+                        .padding(.horizontal, Spacing.screenHorizontal)
+                        .padding(.top, Spacing.xxl)
                 }
             }
-            .padding(.horizontal, Spacing.screenHorizontal)
-            .padding(.top, Spacing.m)
-            .padding(.bottom, Spacing.xxl)
         }
         .background(PawlyColors.cream.ignoresSafeArea())
         .refreshable {
             await dataStore.fetchAllData()
         }
     }
-}
 
-// MARK: - Pet header
-
-private struct PetHeaderCard: View {
-    let pet: PetDTO
-
-    var body: some View {
-        PawlyCard {
-            HStack(alignment: .center, spacing: Spacing.m) {
-                PetAvatarDTO(pet: pet, size: 68)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(pet.name)
-                        .font(PawlyFont.displayMedium)
-                        .foregroundStyle(PawlyColors.ink)
-                    Text("\(Species(rawValue: pet.speciesRaw)?.displayName ?? pet.speciesRaw) • \(ageDescription)")
-                        .font(PawlyFont.bodyMedium)
-                        .foregroundStyle(PawlyColors.slate)
-                }
-                Spacer()
-                MoodSelectorDTO(pet: pet)
-            }
+    private var dateBlock: some View {
+        VStack(alignment: .trailing, spacing: 2) {
+            Text("Today")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(PawlyColors.slate)
+            Text(Date(), format: .dateTime.day().month(.abbreviated))
+                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                .foregroundStyle(PawlyColors.ink)
         }
     }
-    
-    private var ageDescription: String {
-        guard let dob = pet.dateOfBirth else { return "Unknown age" }
-        let comps = Calendar.current.dateComponents([.year, .month], from: dob, to: .now)
-        let y = comps.year ?? 0
-        let m = comps.month ?? 0
-        if y == 0 { return "\(max(0, m))mo" }
-        if m == 0 { return "\(y)y" }
-        return "\(y)y \(m)mo"
-    }
 }
 
-struct PetAvatarDTO: View {
-    let pet: PetDTO
-    var size: CGFloat = 56
+// MARK: - Pet Hero Card
 
-    var body: some View {
-        ZStack {
-            if let photoURL = pet.photoURL,
-               let url = URL(string: photoURL) {
-                AsyncImage(url: url) { image in
-                    image.resizable().scaledToFill()
-                } placeholder: {
-                    Color(hex: pet.accentHex)
-                }
-            } else {
-                Color(hex: pet.accentHex)
-                    .overlay(
-                        Image(systemName: Species(rawValue: pet.speciesRaw)?.sfSymbol ?? "pawprint.fill")
-                            .foregroundStyle(Color.white.opacity(0.9))
-                            .font(.system(size: size * 0.4, weight: .semibold))
-                    )
-            }
-        }
-        .frame(width: size, height: size)
-        .clipShape(RoundedRectangle(cornerRadius: size * 0.28, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
-                .stroke(Color(hex: pet.accentHex), lineWidth: 2)
-        )
-    }
-}
-
-// MARK: - Mood selector
-
-struct MoodSelectorDTO: View {
-    @EnvironmentObject var dataStore: DataStore
-    let pet: PetDTO
-    @State private var showing = false
-
-    private var latest: MoodType? {
-        guard let moodRaw = dataStore.moodEntries(forPetId: pet.id).first?.moodRaw else { return nil }
-        return MoodType(rawValue: moodRaw)
-    }
-
-    var body: some View {
-        Menu {
-            ForEach(MoodType.allCases) { m in
-                Button {
-                    Haptics.light()
-                    Task {
-                        await dataStore.createMoodEntry(forPetId: pet.id, mood: m)
-                    }
-                } label: {
-                    Label("\(m.emoji)  \(m.displayName)", systemImage: "")
-                }
-            }
-        } label: {
-            Text(latest?.emoji ?? "🙂")
-                .font(.system(size: 30))
-                .frame(width: 44, height: 44)
-                .background(Circle().fill(PawlyColors.cream))
-                .overlay(Circle().stroke(PawlyColors.sand, lineWidth: 1))
-        }
-        .accessibilityLabel("Mood picker")
-    }
-}
-
-// MARK: - Today summary
-
-private struct TodaySummaryCard: View {
+private struct PetHeroCard: View {
     @EnvironmentObject var dataStore: DataStore
     let pet: PetDTO
 
@@ -172,40 +95,204 @@ private struct TodaySummaryCard: View {
     }
 
     var body: some View {
-        PawlyCard {
-            VStack(alignment: .leading, spacing: Spacing.s) {
-                Text("Today").font(PawlyFont.caption).foregroundStyle(PawlyColors.slate)
+        HStack(spacing: Spacing.m) {
+            // Avatar
+            PetAvatarDTO(pet: pet, size: 72)
+
+            // Info
+            VStack(alignment: .leading, spacing: 4) {
+                Text(pet.name)
+                    .font(PawlyFont.displayMedium)
+                    .foregroundStyle(PawlyColors.ink)
+
+                Text("\(Species(rawValue: pet.speciesRaw)?.displayName ?? pet.speciesRaw) · \(ageDescription)")
+                    .font(PawlyFont.bodyMedium)
+                    .foregroundStyle(PawlyColors.slate)
+
+                // Quick stats row
                 HStack(spacing: Spacing.m) {
-                    Stat(value: mealsLogged, label: "meals", symbol: "fork.knife")
-                    Divider().frame(height: 40).overlay(PawlyColors.sand)
-                    Stat(value: medsGiven,   label: "meds",  symbol: "pills.fill")
-                    Divider().frame(height: 40).overlay(PawlyColors.sand)
-                    Stat(value: walksDone,   label: "walks", symbol: "figure.walk")
+                    quickStat(mealsLogged, symbol: "fork.knife", label: "meals")
+                    quickStatDivider
+                    quickStat(walksDone, symbol: "figure.walk", label: "walks")
+                    quickStatDivider
+                    quickStat(medsGiven, symbol: "pills.fill", label: "meds")
+                }
+                .padding(.top, 6)
+            }
+
+            Spacer()
+
+            // Mood picker
+            MoodSelectorDTO(pet: pet)
+        }
+        .padding(Spacing.m)
+        .background(
+            RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
+                .fill(PawlyColors.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
+                .stroke(PawlyColors.sand.opacity(0.4), lineWidth: 0.75)
+        )
+        .shadow(color: Color.black.opacity(0.05), radius: 12, x: 0, y: 4)
+    }
+
+    private func quickStat(_ value: Int, symbol: String, label: String) -> some View {
+        VStack(spacing: 2) {
+            Image(systemName: symbol)
+                .font(.system(size: 12))
+                .foregroundStyle(PawlyColors.forest)
+            Text("\(value)")
+                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .foregroundStyle(PawlyColors.ink)
+            Text(label)
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(PawlyColors.slate)
+        }
+    }
+
+    private var quickStatDivider: some View {
+        Rectangle()
+            .fill(PawlyColors.sand.opacity(0.5))
+            .frame(width: 0.75, height: 28)
+    }
+
+    private var ageDescription: String {
+        guard let dob = pet.dateOfBirth else { return "Unknown age" }
+        let comps = Calendar.current.dateComponents([.year, .month], from: dob, to: .now)
+        let y = comps.year ?? 0
+        let m = comps.month ?? 0
+        if y == 0 { return "\(max(0, m))mo" }
+        if m == 0 { return "\(y)y" }
+        return "\(y)y \(m)mo"
+    }
+}
+
+// MARK: - Today Care Section
+
+private struct TodayCareSection: View {
+    @EnvironmentObject var dataStore: DataStore
+    let pet: PetDTO
+
+    private let tasks: [CareTask] = [
+        CareTask(title: "Morning meal",  symbol: "sunrise.fill",      kind: .meal,       detail: "Morning meal"),
+        CareTask(title: "Evening meal",  symbol: "moon.fill",         kind: .meal,       detail: "Evening meal"),
+        CareTask(title: "Walk",          symbol: "figure.walk",        kind: .walk,       detail: ""),
+        CareTask(title: "Fresh water",   symbol: "drop.fill",         kind: .hygiene,    detail: "Fresh water"),
+        CareTask(title: "Medication",    symbol: "pills.fill",        kind: .medication, detail: ""),
+        CareTask(title: "Play time",     symbol: "tennisball.fill",   kind: .walk,       detail: "Play time"),
+        CareTask(title: "Brush / Groom", symbol: "sparkles",          kind: .hygiene,    detail: "Brush / Groom"),
+        CareTask(title: "Bathroom",      symbol: "toilet.fill",       kind: .hygiene,    detail: "Bathroom check"),
+    ]
+
+    private var startOfDay: Date { Date().startOfDay }
+    private var endOfDay:   Date { Date().endOfDay }
+
+    private func countToday(for kind: LogKind) -> Int {
+        dataStore.logEntries(forPetId: pet.id)
+            .filter { $0.kindRaw == kind.rawValue && $0.at >= startOfDay && $0.at <= endOfDay }
+            .count
+    }
+
+    private var doneCount: Int {
+        tasks.filter { countToday(for: $0.kind) > 0 }.count
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s) {
+            // Section header
+            HStack {
+                Text("Today's care")
+                    .font(PawlyFont.headingMedium)
+                    .foregroundStyle(PawlyColors.ink)
+                Spacer()
+                Text("\(doneCount)/\(tasks.count) done")
+                    .font(PawlyFont.caption)
+                    .foregroundStyle(doneCount == tasks.count ? PawlyColors.sage : PawlyColors.slate)
+            }
+
+            // Task grid — 2 columns
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                ForEach(tasks) { task in
+                    CareTaskButton(task: task, count: countToday(for: task.kind)) {
+                        logTask(task)
+                    }
                 }
             }
         }
     }
 
-    private struct Stat: View {
-        let value: Int
-        let label: String
-        let symbol: String
-        var body: some View {
-            HStack(spacing: Spacing.xs) {
-                Image(systemName: symbol).foregroundStyle(PawlyColors.forest)
-                VStack(alignment: .leading) {
-                    Text("\(value)").font(PawlyFont.headingLarge).foregroundStyle(PawlyColors.ink)
-                    Text(label).font(PawlyFont.captionSmall).foregroundStyle(PawlyColors.slate)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+    private func logTask(_ task: CareTask) {
+        Haptics.success()
+        Task {
+            await dataStore.createLogEntry(forPetId: pet.id, kind: task.kind, detail: task.detail)
         }
     }
 }
 
-// MARK: - Up next reminders
+private struct CareTask: Identifiable {
+    let id = UUID()
+    let title: String
+    let symbol: String
+    let kind: LogKind
+    let detail: String
+}
 
-private struct UpNextCard: View {
+private struct CareTaskButton: View {
+    let task: CareTask
+    let count: Int
+    let action: () -> Void
+
+    private var isDone: Bool { count > 0 }
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(isDone ? PawlyColors.forestLight : PawlyColors.surface)
+                        .frame(width: 34, height: 34)
+                    Image(systemName: task.symbol)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(isDone ? PawlyColors.forest : PawlyColors.slate)
+                }
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(task.title)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(isDone ? PawlyColors.slate : PawlyColors.ink)
+                        .strikethrough(isDone, color: PawlyColors.slate)
+                    if isDone {
+                        Text("Done \(count)x")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(PawlyColors.sage)
+                    }
+                }
+
+                Spacer()
+
+                Image(systemName: isDone ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 18))
+                    .foregroundStyle(isDone ? PawlyColors.forest : PawlyColors.sand)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: Radius.small, style: .continuous)
+                    .fill(isDone ? PawlyColors.forestLight : PawlyColors.surface)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: Radius.small, style: .continuous)
+                    .stroke(isDone ? PawlyColors.forest.opacity(0.2) : PawlyColors.sand.opacity(0.5), lineWidth: 0.75)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Up Next Section
+
+private struct UpNextSection: View {
     @EnvironmentObject var dataStore: DataStore
     let pet: PetDTO
 
@@ -219,31 +306,37 @@ private struct UpNextCard: View {
                 instance.scheduledAt >= now.addingTimeInterval(-600)
             }
             .sorted { $0.scheduledAt < $1.scheduledAt }
-            .prefix(2)
+            .prefix(3)
             .map { $0 }
     }
 
     var body: some View {
-        PawlyCard {
-            VStack(alignment: .leading, spacing: Spacing.s) {
-                HStack {
-                    Text("Up next").font(PawlyFont.headingMedium).foregroundStyle(PawlyColors.ink)
-                    Spacer()
-                    NavigationLink(destination: RemindersListViewDTO(pet: pet)) {
-                        Text("See all").font(PawlyFont.caption).foregroundStyle(PawlyColors.forest)
-                    }
+        VStack(alignment: .leading, spacing: Spacing.s) {
+            HStack {
+                Text("Up next")
+                    .font(PawlyFont.headingMedium)
+                    .foregroundStyle(PawlyColors.ink)
+                Spacer()
+                NavigationLink(destination: RemindersListViewDTO(pet: pet)) {
+                    Text("See all")
+                        .font(PawlyFont.caption)
+                        .foregroundStyle(PawlyColors.forest)
                 }
-                if upcoming.isEmpty {
-                    Text("All caught up. Your pet approves. 🌿")
+            }
+
+            if upcoming.isEmpty {
+                HStack(spacing: Spacing.s) {
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.system(size: 20))
+                        .foregroundStyle(PawlyColors.sage)
+                    Text("All caught up — your pet approves.")
                         .font(PawlyFont.bodyMedium)
                         .foregroundStyle(PawlyColors.slate)
-                        .padding(.vertical, Spacing.s)
-                } else {
-                    ForEach(upcoming) { inst in
-                        UpNextRowDTO(instance: inst) {
-                            markDone(inst)
-                        }
-                    }
+                }
+                .padding(.vertical, Spacing.s)
+            } else {
+                ForEach(upcoming) { inst in
+                    UpNextRow(instance: inst) { markDone(inst) }
                 }
             }
         }
@@ -251,17 +344,15 @@ private struct UpNextCard: View {
 
     private func markDone(_ inst: ReminderInstanceDTO) {
         Haptics.success()
-        Task {
-            await dataStore.toggleReminderInstance(inst)
-        }
+        Task { await dataStore.toggleReminderInstance(inst) }
     }
 }
 
-private struct UpNextRowDTO: View {
+private struct UpNextRow: View {
     @EnvironmentObject var dataStore: DataStore
     let instance: ReminderInstanceDTO
     var onMarkDone: () -> Void
-    
+
     private var reminder: ReminderDTO? {
         dataStore.reminders.first { $0.id == instance.reminderId }
     }
@@ -271,184 +362,60 @@ private struct UpNextRowDTO: View {
             if let reminder = reminder,
                let type = ReminderType(rawValue: reminder.typeRaw) {
                 Image(systemName: type.sfSymbol)
+                    .font(.system(size: 16))
                     .foregroundStyle(PawlyColors.forest)
-                    .frame(width: 36, height: 36)
-                    .background(Circle().fill(PawlyColors.cream))
+                    .frame(width: 34, height: 34)
+                    .background(Circle().fill(PawlyColors.forestLight))
             }
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 1) {
                 Text(reminder?.title ?? "Reminder")
-                    .font(PawlyFont.bodyLarge).foregroundStyle(PawlyColors.ink)
+                    .font(PawlyFont.bodyLarge)
+                    .foregroundStyle(PawlyColors.ink)
                 Text(instance.scheduledAt, format: .dateTime.hour().minute())
-                    .font(PawlyFont.caption).foregroundStyle(PawlyColors.slate)
+                    .font(PawlyFont.caption)
+                    .foregroundStyle(PawlyColors.slate)
             }
             Spacer()
             Button(action: onMarkDone) {
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 28))
+                    .font(.system(size: 26))
                     .foregroundStyle(PawlyColors.forest)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Mark done")
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 6)
+        .padding(.horizontal, 12)
+        .background(
+            RoundedRectangle(cornerRadius: Radius.small, style: .continuous)
+                .fill(PawlyColors.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Radius.small, style: .continuous)
+                .stroke(PawlyColors.sand.opacity(0.4), lineWidth: 0.75)
+        )
     }
 }
 
-// MARK: - Daily Care Checklist
+// MARK: - Discover Nudge
 
-private struct DailyTask: Identifiable {
-    let id = UUID()
-    let title: String
-    let symbol: String
-    let kind: LogKind
-    let detail: String
-}
-
-private struct DailyCareCard: View {
-    @EnvironmentObject var dataStore: DataStore
-    let pet: PetDTO
-    @State private var showDetailSheet = false
-    @State private var selectedTask: DailyTask?
-
-    private let tasks: [DailyTask] = [
-        DailyTask(title: "Morning meal",  symbol: "sunrise.fill",      kind: .meal,       detail: "Morning meal"),
-        DailyTask(title: "Evening meal",  symbol: "moon.fill",         kind: .meal,       detail: "Evening meal"),
-        DailyTask(title: "Walk",          symbol: "figure.walk",       kind: .walk,       detail: ""),
-        DailyTask(title: "Fresh water",   symbol: "drop.fill",         kind: .hygiene,    detail: "Fresh water"),
-        DailyTask(title: "Medication",    symbol: "pills.fill",        kind: .medication, detail: ""),
-        DailyTask(title: "Play time",     symbol: "tennisball.fill",   kind: .walk,       detail: "Play time"),
-        DailyTask(title: "Bathroom check",symbol: "toilet.fill",       kind: .hygiene,    detail: "Bathroom check"),
-        DailyTask(title: "Brush / Groom", symbol: "sparkles",          kind: .hygiene,    detail: "Brush / Groom"),
-    ]
-
-    private var startOfDay: Date { Date().startOfDay }
-    private var endOfDay:   Date { Date().endOfDay }
-
-    private func countToday(for kind: LogKind) -> Int {
-        dataStore.logEntries(forPetId: pet.id)
-            .filter { $0.kindRaw == kind.rawValue && $0.at >= startOfDay && $0.at <= endOfDay }
-            .count
-    }
-
-    var body: some View {
-        PawlyCard {
-            VStack(alignment: .leading, spacing: Spacing.s) {
-                HStack {
-                    Text("Daily care")
-                        .font(PawlyFont.headingMedium)
-                        .foregroundStyle(PawlyColors.ink)
-                    Spacer()
-                    let doneCount = tasks.filter { countToday(for: $0.kind) > 0 }.count
-                    Text("\(doneCount)/\(tasks.count)")
-                        .font(PawlyFont.caption)
-                        .foregroundStyle(PawlyColors.slate)
-                }
-
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: Spacing.s) {
-                    ForEach(tasks) { task in
-                        TaskButton(
-                            task: task,
-                            count: countToday(for: task.kind)
-                        ) {
-                            logTask(task)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private func logTask(_ task: DailyTask) {
-        Haptics.success()
-        Task {
-            await dataStore.createLogEntry(
-                forPetId: pet.id,
-                kind: task.kind,
-                detail: task.detail
-            )
-        }
-    }
-}
-
-private struct TaskButton: View {
-    let task: DailyTask
-    let count: Int
-    let action: () -> Void
-
-    private var isDone: Bool { count > 0 }
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: Spacing.s) {
-                ZStack {
-                    Circle()
-                        .fill(isDone ? PawlyColors.sage.opacity(0.15) : PawlyColors.cream)
-                        .frame(width: 36, height: 36)
-                    Image(systemName: task.symbol)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(isDone ? PawlyColors.sage : PawlyColors.forest)
-                }
-
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(task.title)
-                        .font(PawlyFont.bodyMedium)
-                        .foregroundStyle(isDone ? PawlyColors.slate : PawlyColors.ink)
-                        .strikethrough(isDone)
-                    if count > 0 {
-                        Text("Done \(count)")
-                            .font(PawlyFont.captionSmall)
-                            .foregroundStyle(PawlyColors.sage)
-                    }
-                }
-
-                Spacer()
-
-                ZStack {
-                    Circle()
-                        .stroke(isDone ? PawlyColors.sage : PawlyColors.sand, lineWidth: 1.5)
-                        .frame(width: 22, height: 22)
-                    if isDone {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(PawlyColors.sage)
-                    }
-                }
-            }
-            .padding(.horizontal, Spacing.s)
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: Radius.input, style: .continuous)
-                    .fill(isDone ? PawlyColors.surface.opacity(0.5) : PawlyColors.surface)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: Radius.input, style: .continuous)
-                    .stroke(isDone ? PawlyColors.sage.opacity(0.3) : PawlyColors.sand.opacity(0.6), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-// MARK: - Discover prompt (contextual)
-
-private struct DiscoverPromptCard: View {
+private struct DiscoverNudgeCard: View {
     @EnvironmentObject var dataStore: DataStore
     let pet: PetDTO
 
     private var message: String? {
-        // PRD example: "It has been 27 days since deworming".
         let dewormingReminder = dataStore.reminders(forPetId: pet.id)
             .first { $0.typeRaw == "dewormingTickFlea" }
-        
+
         if let reminder = dewormingReminder {
             let completedInstance = dataStore.reminderInstances(forReminderId: reminder.id)
                 .filter { $0.statusRaw == "completed" }
                 .max { ($0.completedAt ?? .distantPast) < ($1.completedAt ?? .distantPast) }
-            
+
             if let when = completedInstance?.completedAt {
                 let days = Date().daysFrom(when)
                 if days >= 20 {
-                    return "It has been \(days) days since deworming. A gentle reminder — most products cover 30."
+                    return "It has been \(days) days since deworming. Most products cover 30 days."
                 }
             }
         }
@@ -457,32 +424,42 @@ private struct DiscoverPromptCard: View {
 
     var body: some View {
         if let message {
-            PawlyCard {
-                VStack(alignment: .leading, spacing: Spacing.xs) {
-                    HStack(spacing: Spacing.xs) {
-                        Image(systemName: "sparkles").foregroundStyle(PawlyColors.peach)
-                        Text("A little nudge").font(PawlyFont.caption).foregroundStyle(PawlyColors.slate)
-                    }
-                    Text(message)
-                        .font(PawlyFont.bodyLarge)
-                        .foregroundStyle(PawlyColors.ink)
-                }
+            HStack(spacing: Spacing.s) {
+                Image(systemName: "lightbulb.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(PawlyColors.peach)
+                Text(message)
+                    .font(PawlyFont.bodyMedium)
+                    .foregroundStyle(PawlyColors.ink)
+                Spacer()
             }
+            .padding(Spacing.m)
+            .background(
+                RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
+                    .fill(PawlyColors.peachLight)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
+                    .stroke(PawlyColors.peach.opacity(0.3), lineWidth: 0.75)
+            )
         } else {
             EmptyView()
         }
     }
 }
 
-// MARK: - Empty pets state
+// MARK: - Empty State
 
 private struct EmptyPetsState: View {
     var body: some View {
-        PawlyCard {
-            VStack(spacing: Spacing.s) {
+        VStack(spacing: Spacing.m) {
+            ZStack {
+                Circle().fill(PawlyColors.forestLight).frame(width: 80, height: 80)
                 Image(systemName: "pawprint.fill")
-                    .font(.system(size: 40))
+                    .font(.system(size: 32))
                     .foregroundStyle(PawlyColors.forest)
+            }
+            VStack(spacing: 6) {
                 Text("No pets yet")
                     .font(PawlyFont.headingMedium)
                     .foregroundStyle(PawlyColors.ink)
@@ -490,9 +467,9 @@ private struct EmptyPetsState: View {
                     .font(PawlyFont.bodyMedium)
                     .foregroundStyle(PawlyColors.slate)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, Spacing.m)
         }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, Spacing.xxl)
     }
 }
 

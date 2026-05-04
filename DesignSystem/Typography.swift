@@ -1,26 +1,25 @@
 import SwiftUI
 
-/// PRD §4.2 — Typography. Currently renders with SF Pro via `.system(...)`.
-/// To wire Fraunces + Inter later, replace the `.system(...)` calls with
-/// `.custom("Fraunces", size:)` / `.custom("Inter", size:)` — no call sites change.
+/// Typography tokens using SF Pro — clean, professional iOS feel.
+/// No decorative serifs. Rely on weight and size to create hierarchy.
 enum PawlyFont {
-    // Display (Fraunces stand-in — serif for warmth)
-    static let displayLarge  = Font.system(size: 32, weight: .semibold, design: .serif)
-    static let displayMedium = Font.system(size: 28, weight: .medium,   design: .serif)
+    // Display — large hero text
+    static let displayLarge  = Font.system(size: 34, weight: .bold,   design: .rounded)
+    static let displayMedium = Font.system(size: 28, weight: .semibold, design: .rounded)
 
-    // Heading (Inter stand-in)
+    // Heading — section titles
     static let headingLarge  = Font.system(size: 22, weight: .semibold, design: .default)
     static let headingMedium = Font.system(size: 18, weight: .semibold, design: .default)
 
-    // Body
+    // Body — readable content
     static let bodyLarge     = Font.system(size: 16, weight: .regular,  design: .default)
     static let bodyMedium    = Font.system(size: 14, weight: .regular,  design: .default)
 
-    // Caption
+    // Caption — metadata and labels
     static let caption       = Font.system(size: 12, weight: .medium,   design: .default)
     static let captionSmall  = Font.system(size: 11, weight: .medium,   design: .default)
 
-    // Tabular numerals for counters & calendar
+    // Monospaced — numbers, times, counters
     static let tabular       = Font.system(size: 16, weight: .medium,   design: .monospaced)
     static let tabularSmall  = Font.system(size: 13, weight: .medium,   design: .monospaced)
 }

@@ -16,7 +16,7 @@ struct PetProfileView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Spacing.m) {
+            VStack(alignment: .leading, spacing: 0) {
                 hero
                 tabBar
 
@@ -29,9 +29,9 @@ struct PetProfileView: View {
                     case .documents: documentsTab
                     }
                 }
+                .padding(.horizontal, Spacing.screenHorizontal)
+                .padding(.top, Spacing.m)
             }
-            .padding(.horizontal, Spacing.screenHorizontal)
-            .padding(.vertical, Spacing.m)
         }
         .background(PawlyColors.cream.ignoresSafeArea())
         .navigationTitle(pet.name)
@@ -46,9 +46,14 @@ struct PetProfileView: View {
                         Label("Mark as passed", systemImage: "leaf.fill")
                     }
                     if pet.status != .active {
-                        Button { setStatus(.active) } label: { Label("Restore", systemImage: "arrow.uturn.backward") }
+                        Button { setStatus(.active) } label: {
+                            Label("Restore", systemImage: "arrow.uturn.backward")
+                        }
                     }
-                } label: { Image(systemName: "ellipsis.circle").tint(PawlyColors.forest) }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .tint(PawlyColors.forest)
+                }
             }
         }
         .alert("Mark \(pet.name) as lost?",
@@ -70,35 +75,47 @@ struct PetProfileView: View {
     // MARK: - Hero
 
     private var hero: some View {
-        PawlyCard {
-            VStack(alignment: .leading, spacing: Spacing.s) {
-                HStack(spacing: Spacing.m) {
-                    PetAvatarDTO(pet: PetDTO(from: pet), size: 84)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(pet.name).font(PawlyFont.displayMedium).foregroundStyle(PawlyColors.ink)
-                        Text("\(pet.species.displayName) • \(pet.breed.isEmpty ? "Mixed" : pet.breed)")
-                            .font(PawlyFont.bodyMedium)
-                            .foregroundStyle(PawlyColors.slate)
-                        Text(pet.ageDescription).font(PawlyFont.caption).foregroundStyle(PawlyColors.slate)
-                    }
-                    Spacer()
-                }
-                if pet.status == .lost {
-                    Text("Lost — please help")
-                        .font(PawlyFont.caption)
-                        .padding(.horizontal, 10).padding(.vertical, 4)
-                        .background(Capsule().fill(PawlyColors.alert))
-                        .foregroundStyle(.white)
-                }
-                if pet.status == .passed {
-                    Text("In loving memory")
-                        .font(PawlyFont.caption)
-                        .padding(.horizontal, 10).padding(.vertical, 4)
-                        .background(Capsule().fill(PawlyColors.slate.opacity(0.2)))
-                        .foregroundStyle(PawlyColors.slate)
-                }
+        HStack(spacing: Spacing.m) {
+            PetAvatarDTO(pet: PetDTO(from: pet), size: 76)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(pet.name)
+                    .font(PawlyFont.displayMedium)
+                    .foregroundStyle(PawlyColors.ink)
+
+                Text("\(pet.species.displayName) · \(pet.breed.isEmpty ? "Mixed" : pet.breed)")
+                    .font(PawlyFont.bodyMedium)
+                    .foregroundStyle(PawlyColors.slate)
+
+                Text(pet.ageDescription)
+                    .font(PawlyFont.caption)
+                    .foregroundStyle(PawlyColors.slate)
+            }
+
+            Spacer()
+
+            if pet.status == .lost {
+                Text("Lost")
+                    .font(.system(size: 10, weight: .semibold))
+                    .padding(.horizontal, 8).padding(.vertical, 4)
+                    .background(Capsule().fill(PawlyColors.alert))
+                    .foregroundStyle(.white)
+            } else if pet.status == .passed {
+                Text("Memorial")
+                    .font(.system(size: 10, weight: .semibold))
+                    .padding(.horizontal, 8).padding(.vertical, 4)
+                    .background(Capsule().fill(PawlyColors.slate.opacity(0.2)))
+                    .foregroundStyle(PawlyColors.slate)
             }
         }
+        .padding(Spacing.m)
+        .background(PawlyColors.surface)
+        .overlay(
+            Rectangle()
+                .fill(PawlyColors.sand.opacity(0.3))
+                .frame(height: 0.5),
+            alignment: .bottom
+        )
     }
 
     // MARK: - Tab bar
@@ -107,19 +124,26 @@ struct PetProfileView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
                 ForEach(ProfileTab.allCases, id: \.self) { t in
-                    Button { tab = t } label: {
+                    Button { withAnimation(.easeInOut(duration: 0.2)) { tab = t } } label: {
                         Text(t.rawValue)
-                            .font(PawlyFont.caption)
-                            .padding(.horizontal, Spacing.s).padding(.vertical, 8)
+                            .font(.system(size: 12, weight: .semibold))
+                            .padding(.horizontal, 14).padding(.vertical, 8)
                             .background(
                                 Capsule().fill(tab == t ? PawlyColors.forest : PawlyColors.surface)
                             )
                             .foregroundStyle(tab == t ? .white : PawlyColors.ink)
-                            .overlay(Capsule().stroke(PawlyColors.sand, lineWidth: 1))
+                            .overlay(
+                                Capsule().stroke(
+                                    tab == t ? PawlyColors.forest : PawlyColors.sand.opacity(0.4),
+                                    lineWidth: 0.75
+                                )
+                            )
                     }
                     .buttonStyle(.plain)
                 }
             }
+            .padding(.horizontal, Spacing.screenHorizontal)
+            .padding(.vertical, Spacing.s)
         }
     }
 
@@ -137,33 +161,26 @@ struct PetProfileView: View {
 
     private var healthTab: some View {
         VStack(alignment: .leading, spacing: Spacing.s) {
-            PawlyCard {
-                VStack(alignment: .leading, spacing: Spacing.xs) {
-                    Text("Vaccinations").font(PawlyFont.headingMedium)
-                    let vaccines = pet.reminders.filter { $0.type == .vaccination }
-                    if vaccines.isEmpty {
-                        Text("No vaccination reminders yet.").font(PawlyFont.bodyMedium).foregroundStyle(PawlyColors.slate)
-                    } else {
-                        ForEach(vaccines) { v in
-                            HStack {
-                                Text(v.title).font(PawlyFont.bodyMedium).foregroundStyle(PawlyColors.ink)
-                                Spacer()
-                                Text(v.recurrence.displayDescription)
-                                    .font(PawlyFont.caption).foregroundStyle(PawlyColors.slate)
-                            }
+            cardSection("Vaccinations") {
+                let vaccines = pet.reminders.filter { $0.type == .vaccination }
+                if vaccines.isEmpty {
+                    Text("No vaccination reminders yet.").font(PawlyFont.bodyMedium).foregroundStyle(PawlyColors.slate)
+                } else {
+                    ForEach(vaccines) { v in
+                        HStack {
+                            Text(v.title).font(PawlyFont.bodyMedium).foregroundStyle(PawlyColors.ink)
+                            Spacer()
+                            Text(v.recurrence.displayDescription)
+                                .font(PawlyFont.caption).foregroundStyle(PawlyColors.slate)
                         }
                     }
                 }
             }
-            PawlyCard {
-                VStack(alignment: .leading, spacing: Spacing.xs) {
-                    Text("Conditions").font(PawlyFont.headingMedium)
-                    Text(pet.ongoingConditionsText.isEmpty ? "None recorded." : pet.ongoingConditionsText)
-                        .font(PawlyFont.bodyMedium)
-                        .foregroundStyle(PawlyColors.slate)
-                }
+            cardSection("Conditions") {
+                Text(pet.ongoingConditionsText.isEmpty ? "None recorded." : pet.ongoingConditionsText)
+                    .font(PawlyFont.bodyMedium)
+                    .foregroundStyle(PawlyColors.slate)
             }
-            WeightCurveCard(pet: pet)
         }
     }
 
@@ -176,24 +193,38 @@ struct PetProfileView: View {
         VStack(alignment: .leading, spacing: Spacing.s) {
             let sorted = pet.logEntries.sorted(by: { $0.at > $1.at })
             if sorted.isEmpty {
-                PawlyCard {
+                cardSection("Logs") {
                     Text("No logs yet. Use the + button to log meals, meds, walks.")
                         .font(PawlyFont.bodyMedium).foregroundStyle(PawlyColors.slate)
                 }
             } else {
                 ForEach(sorted) { log in
-                    PawlyCard {
-                        HStack(spacing: Spacing.m) {
-                            Image(systemName: log.kind.sfSymbol).foregroundStyle(PawlyColors.forest)
-                            VStack(alignment: .leading) {
-                                Text("\(log.kind.displayName): \(log.detail.isEmpty ? "—" : log.detail)")
-                                    .font(PawlyFont.bodyMedium)
-                                Text(log.at, format: .dateTime.month(.abbreviated).day().hour().minute())
-                                    .font(PawlyFont.caption).foregroundStyle(PawlyColors.slate)
-                            }
-                            Spacer()
+                    HStack(spacing: Spacing.m) {
+                        ZStack {
+                            Circle().fill(PawlyColors.forestLight).frame(width: 34, height: 34)
+                            Image(systemName: log.kind.sfSymbol)
+                                .font(.system(size: 14))
+                                .foregroundStyle(PawlyColors.forest)
                         }
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("\(log.kind.displayName): \(log.detail.isEmpty ? "—" : log.detail)")
+                                .font(PawlyFont.bodyMedium)
+                                .foregroundStyle(PawlyColors.ink)
+                            Text(log.at, format: .dateTime.month(.abbreviated).day().hour().minute())
+                                .font(PawlyFont.caption)
+                                .foregroundStyle(PawlyColors.slate)
+                        }
+                        Spacer()
                     }
+                    .padding(Spacing.s)
+                    .background(
+                        RoundedRectangle(cornerRadius: Radius.small, style: .continuous)
+                            .fill(PawlyColors.surface)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Radius.small, style: .continuous)
+                            .stroke(PawlyColors.sand.opacity(0.4), lineWidth: 0.75)
+                    )
                 }
             }
         }
@@ -205,13 +236,40 @@ struct PetProfileView: View {
 
     @ViewBuilder
     private func infoRow(_ label: String, value: String) -> some View {
-        PawlyCard {
-            HStack {
-                Text(label).font(PawlyFont.caption).foregroundStyle(PawlyColors.slate)
-                Spacer()
-                Text(value).font(PawlyFont.bodyMedium).foregroundStyle(PawlyColors.ink)
-            }
+        HStack {
+            Text(label).font(PawlyFont.caption).foregroundStyle(PawlyColors.slate)
+            Spacer()
+            Text(value).font(PawlyFont.bodyMedium).foregroundStyle(PawlyColors.ink)
         }
+        .padding(Spacing.m)
+        .background(
+            RoundedRectangle(cornerRadius: Radius.small, style: .continuous)
+                .fill(PawlyColors.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Radius.small, style: .continuous)
+                .stroke(PawlyColors.sand.opacity(0.4), lineWidth: 0.75)
+        )
+    }
+
+    @ViewBuilder
+    private func cardSection(_ title: String, @ViewBuilder content: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.xs) {
+            Text(title)
+                .font(PawlyFont.headingMedium)
+                .foregroundStyle(PawlyColors.ink)
+            content()
+        }
+        .padding(Spacing.m)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
+                .fill(PawlyColors.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
+                .stroke(PawlyColors.sand.opacity(0.4), lineWidth: 0.75)
+        )
     }
 
     private func setStatus(_ new: PetStatus) {
@@ -237,32 +295,40 @@ private struct WeightCurveCard: View {
     }
 
     var body: some View {
-        PawlyCard {
-            VStack(alignment: .leading, spacing: Spacing.xs) {
-                Text("Weight curve").font(PawlyFont.headingMedium)
-                if weightLogs.count < 2 {
-                    Text("Log weight over time to see a curve here.")
-                        .font(PawlyFont.bodyMedium).foregroundStyle(PawlyColors.slate)
-                } else {
-                    GeometryReader { geo in
-                        let values = weightLogs.compactMap { $0.numericValue }
-                        let minV = (values.min() ?? 0) - 0.3
-                        let maxV = (values.max() ?? 1) + 0.3
-                        let stepX = geo.size.width / CGFloat(max(1, values.count - 1))
-                        Path { path in
-                            for (i, v) in values.enumerated() {
-                                let x = CGFloat(i) * stepX
-                                let normalized = (v - minV) / max(0.001, (maxV - minV))
-                                let y = geo.size.height * (1 - CGFloat(normalized))
-                                if i == 0 { path.move(to: CGPoint(x: x, y: y)) }
-                                else { path.addLine(to: CGPoint(x: x, y: y)) }
-                            }
+        VStack(alignment: .leading, spacing: Spacing.xs) {
+            Text("Weight curve").font(PawlyFont.headingMedium)
+            if weightLogs.count < 2 {
+                Text("Log weight over time to see a curve here.")
+                    .font(PawlyFont.bodyMedium).foregroundStyle(PawlyColors.slate)
+            } else {
+                GeometryReader { geo in
+                    let values = weightLogs.compactMap { $0.numericValue }
+                    let minV = (values.min() ?? 0) - 0.3
+                    let maxV = (values.max() ?? 1) + 0.3
+                    let stepX = geo.size.width / CGFloat(max(1, values.count - 1))
+                    Path { path in
+                        for (i, v) in values.enumerated() {
+                            let x = CGFloat(i) * stepX
+                            let normalized = (v - minV) / max(0.001, (maxV - minV))
+                            let y = geo.size.height * (1 - CGFloat(normalized))
+                            if i == 0 { path.move(to: CGPoint(x: x, y: y)) }
+                            else { path.addLine(to: CGPoint(x: x, y: y)) }
                         }
-                        .stroke(PawlyColors.forest, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
                     }
-                    .frame(height: 80)
+                    .stroke(PawlyColors.forest, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
                 }
+                .frame(height: 80)
             }
         }
+        .padding(Spacing.m)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
+                .fill(PawlyColors.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
+                .stroke(PawlyColors.sand.opacity(0.4), lineWidth: 0.75)
+        )
     }
 }
