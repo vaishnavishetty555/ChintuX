@@ -101,10 +101,9 @@ struct AIDoctorView: View {
             Divider().background(PawlyColors.sand)
 
             HStack(spacing: Spacing.s) {
-                TextField("Ask about \(activePet?.name ?? "your pet")...", text: $prompt, axis: .vertical)
+                TextField("Ask about \(activePet?.name ?? "your pet")...", text: $prompt)
                     .font(PawlyFont.bodyMedium)
                     .focused($isPromptFocused)
-                    .lineLimit(1...4)
                     .padding(.horizontal, Spacing.s)
                     .padding(.vertical, 10)
                     .background(
