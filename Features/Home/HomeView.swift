@@ -28,7 +28,7 @@ struct HomeView: View {
                     PetHeaderCard(pet: pet)
                     TodaySummaryCard(pet: pet)
                     UpNextCard(pet: pet)
-                    ActivityFeedCard(pet: pet)
+                    DailyCareCard(pet: pet)
                     DiscoverPromptCard(pet: pet)
                 } else {
                     EmptyPetsState()
@@ -299,49 +299,63 @@ private struct UpNextRowDTO: View {
     }
 }
 
-// MARK: - Activity feed
+// MARK: - Daily Care Checklist
 
-private struct ActivityFeedCard: View {
+private struct DailyTask: Identifiable {
+    let id = UUID()
+    let title: String
+    let symbol: String
+    let kind: LogKind
+    let detail: String
+}
+
+private struct DailyCareCard: View {
     @EnvironmentObject var dataStore: DataStore
     let pet: PetDTO
+    @State private var showDetailSheet = false
+    @State private var selectedTask: DailyTask?
 
-    private var items: [ActivityItem] {
-        let logs = dataStore.logEntries(forPetId: pet.id).map { ActivityItem.log($0) }
-        let doneInstances = dataStore.reminderInstances
-            .filter { instance in
-                dataStore.reminders(forPetId: pet.id).contains(where: { $0.id == instance.reminderId }) &&
-                instance.statusRaw == "completed" && instance.completedAt != nil
-            }
-            .map { ActivityItem.instance($0) }
-        return (logs + doneInstances)
-            .sorted { $0.date > $1.date }
-            .prefix(4)
-            .map { $0 }
+    private let tasks: [DailyTask] = [
+        DailyTask(title: "Morning meal",  symbol: "sunrise.fill",      kind: .meal,       detail: "Morning meal"),
+        DailyTask(title: "Evening meal",  symbol: "moon.fill",         kind: .meal,       detail: "Evening meal"),
+        DailyTask(title: "Walk",          symbol: "figure.walk",       kind: .walk,       detail: ""),
+        DailyTask(title: "Fresh water",   symbol: "drop.fill",         kind: .hygiene,    detail: "Fresh water"),
+        DailyTask(title: "Medication",    symbol: "pills.fill",        kind: .medication, detail: ""),
+        DailyTask(title: "Play time",     symbol: "tennisball.fill",   kind: .walk,       detail: "Play time"),
+        DailyTask(title: "Bathroom check",symbol: "toilet.fill",       kind: .hygiene,    detail: "Bathroom check"),
+        DailyTask(title: "Brush / Groom", symbol: "sparkles",          kind: .hygiene,    detail: "Brush / Groom"),
+    ]
+
+    private var startOfDay: Date { Date().startOfDay }
+    private var endOfDay:   Date { Date().endOfDay }
+
+    private func countToday(for kind: LogKind) -> Int {
+        dataStore.logEntries(forPetId: pet.id)
+            .filter { $0.kindRaw == kind.rawValue && $0.at >= startOfDay && $0.at <= endOfDay }
+            .count
     }
 
     var body: some View {
         PawlyCard {
             VStack(alignment: .leading, spacing: Spacing.s) {
-                Text("Last 24 hours").font(PawlyFont.headingMedium).foregroundStyle(PawlyColors.ink)
-                if items.isEmpty {
-                    Text("Nothing logged yet today.")
-                        .font(PawlyFont.bodyMedium)
+                HStack {
+                    Text("Daily care")
+                        .font(PawlyFont.headingMedium)
+                        .foregroundStyle(PawlyColors.ink)
+                    Spacer()
+                    let doneCount = tasks.filter { countToday(for: $0.kind) > 0 }.count
+                    Text("\(doneCount)/\(tasks.count)")
+                        .font(PawlyFont.caption)
                         .foregroundStyle(PawlyColors.slate)
-                } else {
-                    ForEach(items) { item in
-                        HStack(spacing: Spacing.s) {
-                            Image(systemName: item.symbol)
-                                .foregroundStyle(PawlyColors.sage)
-                                .frame(width: 24)
-                            VStack(alignment: .leading, spacing: 0) {
-                                Text(item.title)
-                                    .font(PawlyFont.bodyMedium)
-                                    .foregroundStyle(PawlyColors.ink)
-                                Text(item.date, style: .relative)
-                                    .font(PawlyFont.captionSmall)
-                                    .foregroundStyle(PawlyColors.slate)
-                            }
-                            Spacer()
+                }
+
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: Spacing.s) {
+                    ForEach(tasks) { task in
+                        TaskButton(
+                            task: task,
+                            count: countToday(for: task.kind)
+                        ) {
+                            logTask(task)
                         }
                     }
                 }
@@ -349,43 +363,74 @@ private struct ActivityFeedCard: View {
         }
     }
 
-    enum ActivityItem: Identifiable {
-        case log(LogEntryDTO)
-        case instance(ReminderInstanceDTO)
+    private func logTask(_ task: DailyTask) {
+        Haptics.success()
+        Task {
+            await dataStore.createLogEntry(
+                forPetId: pet.id,
+                kind: task.kind,
+                detail: task.detail
+            )
+        }
+    }
+}
 
-        var id: UUID {
-            switch self {
-            case .log(let l): return l.id
-            case .instance(let i): return i.id
-            }
-        }
-        var date: Date {
-            switch self {
-            case .log(let l): return l.at
-            case .instance(let i): return i.completedAt ?? i.scheduledAt
-            }
-        }
-        var symbol: String {
-            @MainActor
-            get {
-                switch self {
-                case .log(let l):
-                    return LogKind(rawValue: l.kindRaw)?.sfSymbol ?? "circle"
-                case .instance(let i):
-                    // Access dataStore through the environment in the view, not here
-                    return "checkmark"
+private struct TaskButton: View {
+    let task: DailyTask
+    let count: Int
+    let action: () -> Void
+
+    private var isDone: Bool { count > 0 }
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: Spacing.s) {
+                ZStack {
+                    Circle()
+                        .fill(isDone ? PawlyColors.sage.opacity(0.15) : PawlyColors.cream)
+                        .frame(width: 36, height: 36)
+                    Image(systemName: task.symbol)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(isDone ? PawlyColors.sage : PawlyColors.forest)
+                }
+
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(task.title)
+                        .font(PawlyFont.bodyMedium)
+                        .foregroundStyle(isDone ? PawlyColors.slate : PawlyColors.ink)
+                        .strikethrough(isDone)
+                    if count > 0 {
+                        Text("Done \(count)")
+                            .font(PawlyFont.captionSmall)
+                            .foregroundStyle(PawlyColors.sage)
+                    }
+                }
+
+                Spacer()
+
+                ZStack {
+                    Circle()
+                        .stroke(isDone ? PawlyColors.sage : PawlyColors.sand, lineWidth: 1.5)
+                        .frame(width: 22, height: 22)
+                    if isDone {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(PawlyColors.sage)
+                    }
                 }
             }
+            .padding(.horizontal, Spacing.s)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: Radius.input, style: .continuous)
+                    .fill(isDone ? PawlyColors.surface.opacity(0.5) : PawlyColors.surface)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: Radius.input, style: .continuous)
+                    .stroke(isDone ? PawlyColors.sage.opacity(0.3) : PawlyColors.sand.opacity(0.6), lineWidth: 1)
+            )
         }
-        var title: String {
-            switch self {
-            case .log(let l):
-                let kind = LogKind(rawValue: l.kindRaw)
-                return "\(kind?.displayName ?? "Log"): \(l.detail.isEmpty ? "logged" : l.detail)"
-            case .instance(let i):
-                return "Reminder — done"
-            }
-        }
+        .buttonStyle(.plain)
     }
 }
 
