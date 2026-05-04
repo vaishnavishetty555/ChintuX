@@ -11,51 +11,55 @@ struct AIDoctorView: View {
     @State private var showFirstUse = true
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @FocusState private var isPromptFocused: Bool
 
     private var activePet: PetDTO? {
         dataStore.pets.first(where: { $0.id == petContext.activePetID }) ?? dataStore.pets.first
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: Spacing.m) {
-                disclaimer
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: Spacing.m) {
+                    disclaimer
 
-                if showFirstUse {
-                    firstUseCard
-                }
+                    if showFirstUse {
+                        firstUseCard
+                    }
 
-                if let errorMessage {
-                    PawlyCard {
-                        HStack(spacing: Spacing.s) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundStyle(PawlyColors.alert)
-                            Text(errorMessage)
-                                .font(PawlyFont.caption)
-                                .foregroundStyle(PawlyColors.alert)
-                            Spacer()
+                    if let errorMessage {
+                        PawlyCard {
+                            HStack(spacing: Spacing.s) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundStyle(PawlyColors.alert)
+                                Text(errorMessage)
+                                    .font(PawlyFont.caption)
+                                    .foregroundStyle(PawlyColors.alert)
+                                Spacer()
+                            }
                         }
                     }
-                }
 
-                ForEach(history) { r in
-                    TriageResponseCard(response: r)
-                }
-
-                if isLoading {
-                    HStack {
-                        Spacer()
-                        ProgressView("Asking AI Doctor...")
-                            .tint(PawlyColors.forest)
-                        Spacer()
+                    ForEach(history) { r in
+                        TriageResponseCard(response: r)
                     }
-                    .padding(.vertical, Spacing.m)
-                }
 
-                composer
+                    if isLoading {
+                        HStack {
+                            Spacer()
+                            ProgressView("Asking AI Doctor...")
+                                .tint(PawlyColors.forest)
+                            Spacer()
+                        }
+                        .padding(.vertical, Spacing.m)
+                    }
+                }
+                .padding(.horizontal, Spacing.screenHorizontal)
+                .padding(.vertical, Spacing.m)
             }
-            .padding(.horizontal, Spacing.screenHorizontal)
-            .padding(.vertical, Spacing.m)
+            .background(PawlyColors.cream)
+
+            composer
         }
         .background(PawlyColors.cream.ignoresSafeArea())
         .navigationTitle("AI Doctor")
@@ -93,32 +97,48 @@ struct AIDoctorView: View {
     }
 
     private var composer: some View {
-        PawlyCard {
-            VStack(alignment: .leading, spacing: Spacing.xs) {
-                Text("Ask about \(activePet?.name ?? "your pet")")
-                    .font(PawlyFont.caption).foregroundStyle(PawlyColors.slate)
-                TextEditor(text: $prompt)
-                    .frame(minHeight: 72)
-                    .padding(Spacing.s)
-                    .background(RoundedRectangle(cornerRadius: Radius.input).fill(PawlyColors.cream))
-                    .overlay(RoundedRectangle(cornerRadius: Radius.input).stroke(PawlyColors.sand, lineWidth: 1))
+        VStack(spacing: 0) {
+            Divider().background(PawlyColors.sand)
 
-                HStack {
-                    Spacer()
-                    Button {
-                        ask()
-                    } label: { Label("Ask AI Doctor", systemImage: "paperplane.fill") }
-                        .buttonStyle(.pawlyPrimary)
-                        .disabled(prompt.trimmingCharacters(in: .whitespaces).isEmpty || isLoading)
+            HStack(spacing: Spacing.s) {
+                TextField("Ask about \(activePet?.name ?? "your pet")...", text: $prompt, axis: .vertical)
+                    .font(PawlyFont.bodyMedium)
+                    .focused($isPromptFocused)
+                    .lineLimit(1...4)
+                    .padding(.horizontal, Spacing.s)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: Radius.input, style: .continuous)
+                            .fill(PawlyColors.surface)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Radius.input, style: .continuous)
+                            .stroke(PawlyColors.sand, lineWidth: 1)
+                    )
+
+                Button {
+                    ask()
+                } label: {
+                    Image(systemName: "paperplane.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
+                        .background(Circle().fill(PawlyColors.forest))
                 }
+                .disabled(prompt.trimmingCharacters(in: .whitespaces).isEmpty || isLoading)
+                .buttonStyle(.plain)
             }
+            .padding(.horizontal, Spacing.screenHorizontal)
+            .padding(.vertical, Spacing.s)
         }
+        .background(PawlyColors.cream)
     }
 
     private func ask() {
         let text = prompt.trimmingCharacters(in: .whitespaces)
         guard !text.isEmpty else { return }
         Haptics.light()
+        isPromptFocused = false
         isLoading = true
         errorMessage = nil
         prompt = ""
