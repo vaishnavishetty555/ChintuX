@@ -44,24 +44,41 @@ class DataStore: ObservableObject {
         defer { isLoading = false }
         
         do {
-            async let petsTask = supabase.fetchPets()
-            async let remindersTask = supabase.fetchReminders()
-            async let instancesTask = supabase.fetchReminderInstances()
-            async let logsTask = supabase.fetchLogEntries()
-            async let moodsTask = supabase.fetchMoodEntries()
-            async let docsTask = supabase.fetchDocuments()
+            // Fetch pets scoped to the authenticated user first
+            let fetchedPets = try await supabase.fetchPets()
+            self.pets = fetchedPets
             
-            let (fetchedPets, fetchedReminders, fetchedInstances, fetchedLogs, fetchedMoods, fetchedDocs) = try await (
-                petsTask,
-                remindersTask,
+            let petIds = fetchedPets.map(\.id)
+            
+            guard !petIds.isEmpty else {
+                // No pets — clear everything else so we don't show stale data
+                self.reminders = []
+                self.reminderInstances = []
+                self.logEntries = []
+                self.moodEntries = []
+                self.documents = []
+                return
+            }
+            
+            // Fetch reminders for this user's pets
+            let fetchedReminders = try await supabase.fetchReminders(forPetIds: petIds)
+            self.reminders = fetchedReminders
+            
+            let reminderIds = fetchedReminders.map(\.id)
+            
+            // Parallel fetch of instances, logs, moods, docs
+            async let instancesTask = supabase.fetchReminderInstances(forReminderIds: reminderIds)
+            async let logsTask = supabase.fetchLogEntries(forPetIds: petIds)
+            async let moodsTask = supabase.fetchMoodEntries(forPetIds: petIds)
+            async let docsTask = supabase.fetchDocuments(forPetIds: petIds)
+            
+            let (fetchedInstances, fetchedLogs, fetchedMoods, fetchedDocs) = try await (
                 instancesTask,
                 logsTask,
                 moodsTask,
                 docsTask
             )
             
-            self.pets = fetchedPets
-            self.reminders = fetchedReminders
             self.reminderInstances = fetchedInstances
             self.logEntries = fetchedLogs
             self.moodEntries = fetchedMoods

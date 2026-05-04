@@ -17,18 +17,20 @@ class SupabaseService: ObservableObject {
     // MARK: - Pets
     
     func fetchPets() async throws -> [PetDTO] {
+        guard let userId = AuthService.shared.userId else { return [] }
         let response = try await client
             .from("pets")
             .select("""
-                id, name, species_raw, breed, date_of_birth, weight_kg, 
+                id, name, species_raw, breed, date_of_birth, weight_kg,
                 sex_raw, neutered, allergies_text, ongoing_conditions_text,
-                accent_hex, photo_url, status_raw, marked_passed_at, 
+                accent_hex, photo_url, status_raw, marked_passed_at,
                 marked_lost_at, vet_name, vet_phone, created_at, user_id
             """)
+            .eq("user_id", value: userId)
             .eq("status_raw", value: "active")
             .order("created_at", ascending: true)
             .execute()
-        
+
         return try Self.decoder.decode([PetDTO].self, from: response.data)
     }
     
@@ -86,6 +88,22 @@ class SupabaseService: ObservableObject {
         return try Self.decoder.decode([ReminderDTO].self, from: response.data)
     }
     
+    func fetchReminders(forPetIds petIds: [UUID]) async throws -> [ReminderDTO] {
+        let response = try await client
+            .from("reminders")
+            .select("""
+                id, pet_id, title, type_raw, dosage, recurrence_raw,
+                first_due_at, notes, prescription_photo_url, quiet_start_hour,
+                quiet_end_hour, created_at, is_active
+            """)
+            .in("pet_id", values: petIds)
+            .eq("is_active", value: true)
+            .order("first_due_at", ascending: true)
+            .execute()
+        
+        return try Self.decoder.decode([ReminderDTO].self, from: response.data)
+    }
+    
     func createReminder(_ reminder: ReminderDTO) async throws -> ReminderDTO {
         let response = try await client
             .from("reminders")
@@ -135,6 +153,17 @@ class SupabaseService: ObservableObject {
         return try Self.decoder.decode([ReminderInstanceDTO].self, from: response.data)
     }
     
+    func fetchReminderInstances(forReminderIds reminderIds: [UUID]) async throws -> [ReminderInstanceDTO] {
+        let response = try await client
+            .from("reminder_instances")
+            .select("id, reminder_id, scheduled_at, status_raw, completed_at, created_at")
+            .in("reminder_id", values: reminderIds)
+            .order("scheduled_at", ascending: true)
+            .execute()
+        
+        return try Self.decoder.decode([ReminderInstanceDTO].self, from: response.data)
+    }
+    
     func createReminderInstance(_ instance: ReminderInstanceDTO) async throws -> ReminderInstanceDTO {
         let response = try await client
             .from("reminder_instances")
@@ -170,6 +199,17 @@ class SupabaseService: ObservableObject {
         }
         
         let response = try await query
+            .order("at", ascending: false)
+            .execute()
+        
+        return try Self.decoder.decode([LogEntryDTO].self, from: response.data)
+    }
+    
+    func fetchLogEntries(forPetIds petIds: [UUID]) async throws -> [LogEntryDTO] {
+        let response = try await client
+            .from("log_entries")
+            .select("id, pet_id, kind_raw, detail, numeric_value, at, created_at")
+            .in("pet_id", values: petIds)
             .order("at", ascending: false)
             .execute()
         
@@ -213,6 +253,17 @@ class SupabaseService: ObservableObject {
         return try Self.decoder.decode([MoodEntryDTO].self, from: response.data)
     }
     
+    func fetchMoodEntries(forPetIds petIds: [UUID]) async throws -> [MoodEntryDTO] {
+        let response = try await client
+            .from("mood_entries")
+            .select("id, pet_id, mood_raw, note, at, created_at")
+            .in("pet_id", values: petIds)
+            .order("at", ascending: false)
+            .execute()
+        
+        return try Self.decoder.decode([MoodEntryDTO].self, from: response.data)
+    }
+    
     func createMoodEntry(_ entry: MoodEntryDTO) async throws -> MoodEntryDTO {
         let response = try await client
             .from("mood_entries")
@@ -230,7 +281,7 @@ class SupabaseService: ObservableObject {
         var query = client
             .from("pet_documents")
             .select("""
-                id, pet_id, title, document_type_raw, file_url, 
+                id, pet_id, title, document_type_raw, file_url,
                 expiry_date, is_encrypted, ocr_text, created_at
             """)
         
@@ -239,6 +290,20 @@ class SupabaseService: ObservableObject {
         }
         
         let response = try await query
+            .order("created_at", ascending: false)
+            .execute()
+        
+        return try Self.decoder.decode([PetDocumentDTO].self, from: response.data)
+    }
+    
+    func fetchDocuments(forPetIds petIds: [UUID]) async throws -> [PetDocumentDTO] {
+        let response = try await client
+            .from("pet_documents")
+            .select("""
+                id, pet_id, title, document_type_raw, file_url,
+                expiry_date, is_encrypted, ocr_text, created_at
+            """)
+            .in("pet_id", values: petIds)
             .order("created_at", ascending: false)
             .execute()
         

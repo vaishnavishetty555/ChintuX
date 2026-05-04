@@ -25,6 +25,7 @@ final class AuthService: ObservableObject {
     /// Attempt to restore an existing session on cold launch.
     func restoreSession() async {
         isLoading = true
+        authError = nil
         defer { isLoading = false }
         do {
             let session = try await client.auth.session
@@ -84,6 +85,7 @@ final class AuthService: ObservableObject {
 
     func signOut() async {
         isLoading = true
+        authError = nil
         defer { isLoading = false }
         do {
             try await client.auth.signOut()

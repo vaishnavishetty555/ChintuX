@@ -1,21 +1,22 @@
 import SwiftUI
 
-/// Decides between Auth, Onboarding and MainTabView based on authentication
-/// and whether any active pet exists.
+/// Decides between Auth, Loading, Onboarding and MainTabView.
+/// Removes the global onboardingComplete flag; the source of truth is
+/// whether the authenticated user has pets in Supabase.
 struct RootView: View {
     @EnvironmentObject private var authService: AuthService
     @EnvironmentObject private var petContext: PetContextStore
     @EnvironmentObject private var dataStore: DataStore
-    @AppStorage("pawly.onboardingComplete") private var onboardingComplete: Bool = false
+    @State private var initialLoadComplete = false
 
     var body: some View {
         Group {
             if !authService.isAuthenticated {
                 AuthView()
-            } else if !onboardingComplete || dataStore.pets.filter({ $0.statusRaw == "active" }).isEmpty {
-                OnboardingCoordinator(onComplete: {
-                    onboardingComplete = true
-                })
+            } else if !initialLoadComplete || dataStore.isLoading {
+                loadingView
+            } else if dataStore.pets.filter({ $0.statusRaw == "active" }).isEmpty {
+                OnboardingCoordinator(onComplete: {})
             } else {
                 MainTabView()
                     .onAppear {
@@ -28,19 +29,36 @@ struct RootView: View {
         }
         .background(PawlyColors.cream.ignoresSafeArea())
         .task {
-            // Fetch data once auth is confirmed
             if authService.isAuthenticated {
-                await dataStore.fetchAllData()
+                await loadData()
             }
         }
         .onChange(of: authService.isAuthenticated) { _, isAuth in
             if isAuth {
-                Task { await dataStore.fetchAllData() }
+                Task { await loadData() }
             } else {
                 dataStore.clear()
-                onboardingComplete = false
+                initialLoadComplete = false
             }
         }
+    }
+
+    private func loadData() async {
+        initialLoadComplete = false
+        await dataStore.fetchAllData()
+        initialLoadComplete = true
+    }
+
+    private var loadingView: some View {
+        VStack(spacing: Spacing.m) {
+            ProgressView()
+                .tint(PawlyColors.forest)
+                .scaleEffect(1.2)
+            Text("Loading your pets...")
+                .font(PawlyFont.bodyMedium)
+                .foregroundStyle(PawlyColors.slate)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
