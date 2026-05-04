@@ -34,6 +34,8 @@ targets:
           - "project.yml"
           - "Pawly.xcodeproj"
           - "PawlyTests"
+          - "supabase_schema.sql"
+          - "supabase_schema_anonymous.sql"
     resources:
       - path: Assets.xcassets
     dependencies:

@@ -2,7 +2,7 @@ import SwiftUI
 
 /// PRD §6.5 — AI Doctor confidence pill.
 struct ConfidenceBadge: View {
-    enum Level: String, CaseIterable {
+    enum Level: String, Codable, CaseIterable {
         case low, medium, high
         var label: String {
             switch self {

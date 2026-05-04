@@ -103,32 +103,32 @@ final class PawlyTests: XCTestCase {
         XCTAssertEqual(dates.count, 7)  // May..Nov on the 15th
     }
 
-    // MARK: - MockAIDoctorService
+    // MARK: - GroqService fallback (offline keyword heuristics)
 
-    func test_aiDoctor_classifies_emergency() {
-        let r = MockAIDoctorService.respond(to: "My dog is coughing up blood!")
+    func test_aiDoctor_classifies_emergency() async {
+        let r = await GroqService.respond(to: "My dog is coughing up blood!")
         XCTAssertEqual(r.urgency, .vetNow)
     }
 
-    func test_aiDoctor_classifies_vomit_as_24h() {
-        let r = MockAIDoctorService.respond(to: "Vomited twice this morning")
+    func test_aiDoctor_classifies_vomit_as_24h() async {
+        let r = await GroqService.respond(to: "Vomited twice this morning")
         XCTAssertEqual(r.urgency, .vetWithin24h)
     }
 
-    func test_aiDoctor_classifies_itch_as_watch_at_home() {
-        let r = MockAIDoctorService.respond(to: "He keeps scratching his ears")
+    func test_aiDoctor_classifies_itch_as_watch_at_home() async {
+        let r = await GroqService.respond(to: "He keeps scratching his ears")
         XCTAssertEqual(r.urgency, .watchAtHome)
     }
 
-    func test_aiDoctor_default_is_low_confidence() {
-        let r = MockAIDoctorService.respond(to: "Something seems off")
+    func test_aiDoctor_default_is_low_confidence() async {
+        let r = await GroqService.respond(to: "Something seems off")
         XCTAssertEqual(r.confidence, .low)
     }
 
-    func test_aiDoctor_all_responses_have_four_parts() {
+    func test_aiDoctor_all_responses_have_four_parts() async {
         let prompts = ["blood", "vomit", "scratching", "lethargy", "something else"]
         for p in prompts {
-            let r = MockAIDoctorService.respond(to: p)
+            let r = await GroqService.respond(to: p)
             XCTAssertFalse(r.whatMightBeHappening.isEmpty)
             XCTAssertFalse(r.whatYouCanDoNow.isEmpty)
             XCTAssertFalse(r.whenToEscalate.isEmpty)

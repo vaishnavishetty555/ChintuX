@@ -1,21 +1,19 @@
 import SwiftUI
-import SwiftData
 
 /// PRD §6.5 — AI Doctor chat with structured 4-part triage response.
+/// Now powered by Groq LLM API with offline keyword fallback.
 struct AIDoctorView: View {
-    @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var petContext: PetContextStore
-    @Query(
-        filter: #Predicate<Pet> { $0.statusRaw == "active" },
-        sort: [SortDescriptor(\Pet.createdAt)]
-    ) private var pets: [Pet]
+    @EnvironmentObject var dataStore: DataStore
 
     @State private var prompt: String = ""
     @State private var history: [TriageResponse] = []
     @State private var showFirstUse = true
+    @State private var isLoading = false
+    @State private var errorMessage: String?
 
-    private var activePet: Pet? {
-        pets.first(where: { $0.id == petContext.activePetID }) ?? pets.first
+    private var activePet: PetDTO? {
+        dataStore.pets.first(where: { $0.id == petContext.activePetID }) ?? dataStore.pets.first
     }
 
     var body: some View {
@@ -27,8 +25,31 @@ struct AIDoctorView: View {
                     firstUseCard
                 }
 
+                if let errorMessage {
+                    PawlyCard {
+                        HStack(spacing: Spacing.s) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(PawlyColors.alert)
+                            Text(errorMessage)
+                                .font(PawlyFont.caption)
+                                .foregroundStyle(PawlyColors.alert)
+                            Spacer()
+                        }
+                    }
+                }
+
                 ForEach(history) { r in
                     TriageResponseCard(response: r)
+                }
+
+                if isLoading {
+                    HStack {
+                        Spacer()
+                        ProgressView("Asking AI Doctor...")
+                            .tint(PawlyColors.forest)
+                        Spacer()
+                    }
+                    .padding(.vertical, Spacing.m)
                 }
 
                 composer
@@ -88,7 +109,7 @@ struct AIDoctorView: View {
                         ask()
                     } label: { Label("Ask AI Doctor", systemImage: "paperplane.fill") }
                         .buttonStyle(.pawlyPrimary)
-                        .disabled(prompt.trimmingCharacters(in: .whitespaces).isEmpty)
+                        .disabled(prompt.trimmingCharacters(in: .whitespaces).isEmpty || isLoading)
                 }
             }
         }
@@ -98,11 +119,20 @@ struct AIDoctorView: View {
         let text = prompt.trimmingCharacters(in: .whitespaces)
         guard !text.isEmpty else { return }
         Haptics.light()
-        let response = MockAIDoctorService.respond(to: text, petName: activePet?.name ?? "your pet")
-        withAnimation(Motion.transition) {
-            history.insert(response, at: 0)
-        }
+        isLoading = true
+        errorMessage = nil
         prompt = ""
+
+        Task {
+            let response = await GroqService.respond(
+                to: text,
+                petName: activePet?.name ?? "your pet"
+            )
+            withAnimation(Motion.transition) {
+                history.insert(response, at: 0)
+                isLoading = false
+            }
+        }
     }
 }
 
@@ -151,7 +181,7 @@ struct TriageResponseCard: View {
                 }
 
                 HStack {
-                    Text(response.urgency.rawValue)
+                    Text(response.urgency.displayValue)
                         .font(PawlyFont.caption)
                         .padding(.horizontal, 10).padding(.vertical, 4)
                         .background(Capsule().fill(urgencyColor.opacity(0.2)))
@@ -165,7 +195,6 @@ struct TriageResponseCard: View {
                 section("When to escalate", items: response.whenToEscalate)
 
                 Button {
-                    // In V1 this would open a vet booking flow.
                     Haptics.medium()
                 } label: {
                     Label("Book a vet", systemImage: "calendar.badge.clock")
@@ -193,5 +222,5 @@ struct TriageResponseCard: View {
 #Preview("AI Doctor") {
     NavigationStack { AIDoctorView() }
         .environmentObject(PreviewSupport.previewPetContext)
-        .modelContainer(PreviewSupport.container)
+        .environmentObject(DataStore.shared)
 }
