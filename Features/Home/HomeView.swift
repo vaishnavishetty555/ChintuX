@@ -478,3 +478,70 @@ private struct EmptyPetsState: View {
         .environmentObject(PetContextStore())
         .environmentObject(DataStore.shared)
 }
+
+// MARK: - Pet Avatar DTO
+
+struct PetAvatarDTO: View {
+    let pet: PetDTO
+    var size: CGFloat = 56
+
+    var body: some View {
+        ZStack {
+            if let photoURL = pet.photoURL,
+               let url = URL(string: photoURL) {
+                AsyncImage(url: url) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: {
+                    Color(hex: pet.accentHex)
+                }
+            } else {
+                Color(hex: pet.accentHex)
+                    .overlay(
+                        Image(systemName: Species(rawValue: pet.speciesRaw)?.sfSymbol ?? "pawprint.fill")
+                            .foregroundStyle(Color.white.opacity(0.9))
+                            .font(.system(size: size * 0.4, weight: .semibold))
+                    )
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: size * 0.28, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
+                .stroke(Color(hex: pet.accentHex), lineWidth: 2)
+        )
+    }
+}
+
+// MARK: - Mood Selector DTO
+
+struct MoodSelectorDTO: View {
+    @EnvironmentObject var dataStore: DataStore
+    let pet: PetDTO
+
+    private var latest: MoodType? {
+        guard let moodRaw = dataStore.moodEntries(forPetId: pet.id).first?.moodRaw else { return nil }
+        return MoodType(rawValue: moodRaw)
+    }
+
+    var body: some View {
+        Menu {
+            ForEach(MoodType.allCases) { m in
+                Button {
+                    Haptics.light()
+                    Task {
+                        await dataStore.createMoodEntry(forPetId: pet.id, mood: m)
+                    }
+                } label: {
+                    Label("\(m.emoji)  \(m.displayName)", systemImage: "")
+                }
+            }
+        } label: {
+            Text(latest?.emoji ?? "🙂")
+                .font(.system(size: 30))
+                .frame(width: 44, height: 44)
+                .background(Circle().fill(PawlyColors.cream))
+                .overlay(Circle().stroke(PawlyColors.sand, lineWidth: 1))
+        }
+        .accessibilityLabel("Mood picker")
+    }
+}
