@@ -12,6 +12,7 @@ final class AuthService: ObservableObject {
     @Published var isLoading = false
     @Published var authError: String?
     @Published var isInPasswordRecovery = false
+    @Published var pendingResetEmail: String?  // Email for OTP-based password reset
 
     private let client = SupabaseConfig.client
 
@@ -82,10 +83,21 @@ final class AuthService: ObservableObject {
                 email: email,
                 password: password
             )
+            // Check if user already existed - Supabase returns existing user without session
+            if response.session == nil {
+                // This could mean user already exists
+                authError = "An account with this email already exists. Please log in instead."
+                return false
+            }
             currentUser = response.user
             return true
         } catch {
-            authError = error.localizedDescription
+            let errorMessage = error.localizedDescription
+            if errorMessage.contains("already") {
+                authError = "An account with this email already exists. Please log in instead."
+            } else {
+                authError = errorMessage
+            }
             return false
         }
     }
@@ -109,17 +121,19 @@ final class AuthService: ObservableObject {
         }
     }
 
-    // MARK: - Reset Password
+    // MARK: - Reset Password (OTP-based)
 
-    func resetPassword(email: String) async -> Bool {
+    /// Send OTP to email for password reset
+    /// Uses resetPasswordForEmail which sends a recovery OTP
+    func sendPasswordResetOTP(email: String) async -> Bool {
         isLoading = true
         authError = nil
         defer { isLoading = false }
         do {
-            try await client.auth.resetPasswordForEmail(
-                email,
-                redirectTo: URL(string: "https://www.pawnfurr.com/reset-password")
-            )
+            // Use resetPasswordForEmail - this sends a recovery email with OTP
+            // The email template should be configured to show {{ .Token }} instead of a link
+            try await client.auth.resetPasswordForEmail(email)
+            pendingResetEmail = email
             return true
         } catch {
             authError = error.localizedDescription
@@ -127,19 +141,53 @@ final class AuthService: ObservableObject {
         }
     }
 
-    /// Called after the user opens the recovery deep link and enters a new password.
-    func setNewPassword(_ newPassword: String) async -> Bool {
+    /// Verify the OTP code entered by user using recovery type
+    /// This establishes a recovery session that allows password updates
+    func verifyPasswordResetOTP(email: String, token: String) async -> Bool {
         isLoading = true
         authError = nil
         defer { isLoading = false }
         do {
-            let user = try await client.auth.update(user: UserAttributes(password: newPassword))
-            currentUser = user
+            // Use .recovery type for password reset OTP
+            // This creates a special recovery session
+            let session = try await client.auth.verifyOTP(
+                email: email,
+                token: token,
+                type: .recovery
+            )
+            currentUser = session.user
+            isInPasswordRecovery = true
             return true
         } catch {
             authError = error.localizedDescription
             return false
         }
+    }
+
+    /// Called after OTP verification when user enters a new password.
+    /// Uses the recovery session established by verifyOTP
+    func setNewPassword(_ newPassword: String) async -> Bool {
+        isLoading = true
+        authError = nil
+        defer { isLoading = false }
+        do {
+            // Update the password - this works with the recovery session
+            let user = try await client.auth.update(user: UserAttributes(password: newPassword))
+            currentUser = user
+            pendingResetEmail = nil
+            isInPasswordRecovery = false
+            return true
+        } catch {
+            authError = error.localizedDescription
+            return false
+        }
+    }
+
+    /// Cancel/reset the password recovery flow
+    func cancelPasswordRecovery() {
+        isInPasswordRecovery = false
+        pendingResetEmail = nil
+        authError = nil
     }
 
     /// Handle Supabase deep-link (password recovery, magic link, etc.)

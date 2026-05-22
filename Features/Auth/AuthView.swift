@@ -512,7 +512,7 @@ struct AuthErrorBanner: View {
     }
 }
 
-// MARK: - Forgot Password Sheet
+// MARK: - Forgot Password Sheet (OTP-based flow)
 
 private struct ForgotPasswordSheet: View {
     let prefillEmail: String
@@ -520,9 +520,12 @@ private struct ForgotPasswordSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var email: String = ""
-    @State private var isSent = false
+    @State private var otpCode: String = ""
+    @State private var isCodeSent = false
     @State private var isSending = false
+    @State private var isVerifying = false
     @State private var errorMessage: String? = nil
+    @State private var showSetNewPassword = false
 
     var body: some View {
         NavigationStack {
@@ -531,26 +534,27 @@ private struct ForgotPasswordSheet: View {
                     Circle()
                         .fill(Color(hex: "#47C1B1").opacity(0.12))
                         .frame(width: 72, height: 72)
-                    Image(systemName: isSent ? "checkmark.circle.fill" : "lock.rotation")
+                    Image(systemName: isCodeSent ? "envelope.badge.shield.half.filled" : "lock.rotation")
                         .font(.system(size: 30))
                         .foregroundStyle(Color(hex: "#47C1B1"))
                 }
                 .padding(.top, 8)
 
                 VStack(spacing: 8) {
-                    Text(isSent ? "Check your inbox" : "Reset your password")
+                    Text(isCodeSent ? "Enter verification code" : "Reset your password")
                         .font(.system(size: 22, weight: .bold))
                         .foregroundStyle(Color(hex: "#1A237E"))
-                    Text(isSent
-                         ? "We've sent a reset link to \(email). Check your email and follow the instructions."
-                         : "Enter your email and we'll send you a link to reset your password.")
+                    Text(isCodeSent
+                         ? "We've sent an 8-digit code to \(email). Enter it below to continue."
+                         : "Enter your email and we'll send you a verification code to reset your password.")
                         .font(.system(size: 14))
                         .foregroundStyle(Color(hex: "#6C757D"))
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 8)
                 }
 
-                if !isSent {
+                if !isCodeSent {
+                    // Step 1: Enter email
                     AuthIconInput(
                         icon: "envelope",
                         iconColor: Color(hex: "#47C1B1"),
@@ -564,11 +568,11 @@ private struct ForgotPasswordSheet: View {
                     }
 
                     Button {
-                        Task { await sendReset() }
+                        Task { await sendOTP() }
                     } label: {
                         HStack(spacing: 8) {
                             if isSending { ProgressView().tint(.white).scaleEffect(0.8) }
-                            Text("Send reset link")
+                            Text("Send code")
                                 .font(.system(size: 16, weight: .bold))
                         }
                         .foregroundStyle(.white)
@@ -589,20 +593,90 @@ private struct ForgotPasswordSheet: View {
                     .disabled(email.trimmingCharacters(in: .whitespaces).isEmpty || isSending)
                     .opacity(email.trimmingCharacters(in: .whitespaces).isEmpty ? 0.6 : 1)
                 } else {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Text("Back to login")
-                            .font(.system(size: 16, weight: .bold))
+                    // Step 2: Enter OTP code
+                    VStack(spacing: 16) {
+                        // OTP Input field
+                        HStack {
+                            Image(systemName: "number")
+                                .font(.system(size: 17))
+                                .foregroundStyle(Color(hex: "#47C1B1"))
+                                .frame(width: 22)
+
+                            TextField("Enter 8-digit code", text: $otpCode)
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(Color(hex: "#333333"))
+                                .keyboardType(.numberPad)
+                                .textContentType(.oneTimeCode)
+                                .multilineTextAlignment(.center)
+                                .onChange(of: otpCode) { oldValue, newValue in
+                                    // Limit to 8 digits
+                                    let filtered = newValue.filter { $0.isNumber }
+                                    if filtered.count > 8 {
+                                        otpCode = String(filtered.prefix(8))
+                                    } else if filtered != newValue {
+                                        otpCode = filtered
+                                    }
+                                }
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 13)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .fill(Color.white.opacity(0.72))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .stroke(Color(hex: "#47C1B1").opacity(0.55), lineWidth: 1.5)
+                        )
+
+                        if let errorMessage {
+                            AuthErrorBanner(message: errorMessage)
+                        }
+
+                        Button {
+                            Task { await verifyOTP() }
+                        } label: {
+                            HStack(spacing: 8) {
+                                if isVerifying { ProgressView().tint(.white).scaleEffect(0.8) }
+                                Text("Verify & Continue")
+                                    .font(.system(size: 16, weight: .bold))
+                            }
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
                             .frame(height: 52)
                             .background(
                                 RoundedRectangle(cornerRadius: 26, style: .continuous)
-                                    .fill(Color(hex: "#47C1B1"))
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color(hex: "#5ED7C6"), Color(hex: "#47C1B1")],
+                                            startPoint: .leading, endPoint: .trailing
+                                        )
+                                    )
+                                    .shadow(color: Color(hex: "#47C1B1").opacity(0.35), radius: 10, x: 0, y: 5)
                             )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(otpCode.count != 8 || isVerifying)
+                        .opacity(otpCode.count == 8 ? 1.0 : 0.6)
+
+                        // Resend code button
+                        Button {
+                            Task { await sendOTP() }
+                        } label: {
+                            HStack(spacing: 4) {
+                                if isSending {
+                                    ProgressView()
+                                        .tint(Color(hex: "#47C1B1"))
+                                        .scaleEffect(0.7)
+                                }
+                                Text("Didn't receive it? Resend")
+                                    .font(.system(size: 14, weight: .medium))
+                            }
+                            .foregroundStyle(Color(hex: "#47C1B1"))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isSending)
                     }
-                    .buttonStyle(.plain)
                 }
 
                 Spacer()
@@ -612,7 +686,10 @@ private struct ForgotPasswordSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") { dismiss() }
+                    Button("Cancel") {
+                        authService.cancelPasswordRecovery()
+                        dismiss()
+                    }
                         .foregroundStyle(Color(hex: "#47C1B1"))
                 }
             }
@@ -620,17 +697,41 @@ private struct ForgotPasswordSheet: View {
         .presentationDetents([.medium])
         .presentationDragIndicator(.visible)
         .onAppear { email = prefillEmail }
+        .sheet(isPresented: $showSetNewPassword) {
+            SetNewPasswordView()
+                .environmentObject(authService)
+        }
     }
 
-    private func sendReset() async {
+    private func sendOTP() async {
         isSending = true
         errorMessage = nil
-        let success = await authService.resetPassword(email: email.trimmingCharacters(in: .whitespaces))
+        let success = await authService.sendPasswordResetOTP(email: email.trimmingCharacters(in: .whitespaces))
         isSending = false
         if success {
-            isSent = true
+            isCodeSent = true
         } else {
-            errorMessage = authService.authError ?? "Failed to send reset email. Please try again."
+            errorMessage = authService.authError ?? "Failed to send code. Please try again."
+        }
+    }
+
+    private func verifyOTP() async {
+        isVerifying = true
+        errorMessage = nil
+        let success = await authService.verifyPasswordResetOTP(
+            email: email.trimmingCharacters(in: .whitespaces),
+            token: otpCode.trimmingCharacters(in: .whitespaces)
+        )
+        isVerifying = false
+        if success {
+            dismiss()
+            // Small delay to let the sheet dismiss before showing password reset
+            try? await Task.sleep(for: .milliseconds(300))
+            await MainActor.run {
+                showSetNewPassword = true
+            }
+        } else {
+            errorMessage = authService.authError ?? "Invalid code. Please try again."
         }
     }
 }

@@ -27,7 +27,7 @@ struct PawlyApp: App {
                 }
                 .sheet(isPresented: Binding(
                     get: { authService.isInPasswordRecovery },
-                    set: { if !$0 { authService.isInPasswordRecovery = false } }
+                    set: { if !$0 { authService.cancelPasswordRecovery() } }
                 )) {
                     SetNewPasswordView()
                         .environmentObject(authService)
