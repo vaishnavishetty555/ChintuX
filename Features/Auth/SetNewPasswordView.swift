@@ -42,7 +42,41 @@ struct SetNewPasswordView: View {
                         .multilineTextAlignment(.center)
                 }
 
-                if didSave {
+                // If the link was already invalid when the app opened, show a clear
+                // error banner instead of the password fields.
+                if let linkError = authService.authError, !didSave, newPassword.isEmpty, confirmPassword.isEmpty {
+                    VStack(spacing: 16) {
+                        Image(systemName: "link.badge.xmark")
+                            .font(.system(size: 44))
+                            .foregroundStyle(Color(hex: "#DC2626"))
+
+                        Text("Link expired")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(Color(hex: "#1A237E"))
+
+                        Text(linkError)
+                            .font(.system(size: 14))
+                            .foregroundStyle(Color(hex: "#6C757D"))
+                            .multilineTextAlignment(.center)
+
+                        Button {
+                            authService.authError = nil
+                            authService.isInPasswordRecovery = false
+                        } label: {
+                            Text("Request a new link")
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundStyle(.white)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 48)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                                        .fill(Color(hex: "#47C1B1"))
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.vertical, 12)
+                } else if didSave {
                     VStack(spacing: 10) {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 44))

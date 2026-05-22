@@ -19,11 +19,20 @@ final class AuthService: ObservableObject {
         Task { @MainActor in
             await restoreSession()
         }
-        // Keep currentUser in sync with Supabase token refresh and sign-out events
+        // Keep currentUser in sync with Supabase token refresh and sign-out events.
+        // NOTE: For a password-recovery deep link Supabase emits .signedIn THEN
+        // .passwordRecovery in the same stream.  We must NOT reset isInPasswordRecovery
+        // inside .signedIn — let .passwordRecovery do it so the sheet always appears.
         Task { @MainActor in
             for await (event, session) in await client.auth.authStateChanges {
                 switch event {
-                case .signedIn, .tokenRefreshed, .userUpdated:
+                case .signedIn:
+                    currentUser = session?.user
+                    // Do NOT touch isInPasswordRecovery here — .passwordRecovery follows
+                    // immediately for recovery sessions and will set it to true.
+                case .tokenRefreshed:
+                    currentUser = session?.user
+                case .userUpdated:
                     currentUser = session?.user
                     isInPasswordRecovery = false
                 case .passwordRecovery:
@@ -134,9 +143,39 @@ final class AuthService: ObservableObject {
     }
 
     /// Handle Supabase deep-link (password recovery, magic link, etc.)
+    ///
+    /// Supabase PKCE flow: the email link lands on pawnfurr.com/reset-password which
+    /// forwards `?code=` to the `pawnfurr://` scheme.  `session(from:)` exchanges the
+    /// code for a session and fires `.passwordRecovery` in `authStateChanges`.
+    ///
+    /// Three failure modes we guard against:
+    ///  1. PKCE code-verifier not in storage (app was killed before opening link)
+    ///     → we fall back to treating it as an expired link and tell the user.
+    ///  2. Code already redeemed or expired → same user-visible message.
+    ///  3. Supabase events arrive before `authStateChanges` loop is listening
+    ///     → we set `isInPasswordRecovery` ourselves after a successful exchange.
     func handleDeepLink(_ url: URL) {
+        let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        let isRecoveryURL = components?.queryItems?.contains(where: { $0.name == "code" }) == true
+            || url.fragment?.contains("type=recovery") == true
+
         Task {
-            try? await client.auth.session(from: url)
+            do {
+                try await client.auth.session(from: url)
+                // session(from:) succeeded — authStateChanges will emit .passwordRecovery.
+                // As a safety net (race: authStateChanges loop not yet subscribed),
+                // also set the flag here if this looks like a recovery URL.
+                if isRecoveryURL {
+                    isInPasswordRecovery = true
+                }
+            } catch {
+                if isRecoveryURL {
+                    // Tell the user what happened so they can request a new link.
+                    authError = "This password reset link has expired or has already been used. Please request a new one."
+                    // Still surface the password-recovery screen so the error is visible.
+                    isInPasswordRecovery = true
+                }
+            }
         }
     }
 

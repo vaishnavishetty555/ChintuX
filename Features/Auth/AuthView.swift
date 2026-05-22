@@ -9,45 +9,81 @@ struct AuthView: View {
     enum AuthMode { case login, signup }
 
     var body: some View {
-        ZStack {
-            // Warm cream background
-            Color(hex: "#FFFBF5").ignoresSafeArea()
+        GeometryReader { geo in
+            ZStack(alignment: .bottom) {
 
-            ScrollView {
+                // ── Full-bleed background illustration ──
+                // Extra height + upward offset reveals the cat/bottom pets
+                // that would otherwise sit behind the glass card.
+                Image("LoginBG")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: geo.size.width, height: geo.size.height + 100)
+                    .offset(y: -50)
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .clipped()
+                    .ignoresSafeArea()
+
+                // ── Logo + Card stack, bottom-anchored ──
+                // Logo floats centered above the glass card; card is shorter without it.
                 VStack(spacing: 0) {
-                    // ── HEADER: Logo ──
+
+                    // Logo — outside the card, centered in the VStack
                     Image("AppLogo")
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 200)
-                        .padding(.top, 24)
+                        .frame(width: 118)
+                        .padding(.bottom, 38)
 
-                    // ── FORM CARD ──
+                    // ── Glass card ──
                     VStack(spacing: 0) {
-                        if mode == .login {
-                            LoginFormCard()
-                                .transition(.asymmetric(
-                                    insertion: .move(edge: .leading).combined(with: .opacity),
-                                    removal: .move(edge: .trailing).combined(with: .opacity)
-                                ))
-                        } else {
-                            SignUpFormCard()
-                                .transition(.asymmetric(
-                                    insertion: .move(edge: .trailing).combined(with: .opacity),
-                                    removal: .move(edge: .leading).combined(with: .opacity)
-                                ))
-                        }
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.top, 8)
 
-                    // ── FOOTER ──
-                    VStack(spacing: 16) {
-                        if mode == .login {
-                            HStack(spacing: 4) {
+                        // Mode title
+                        VStack(spacing: 4) {
+                            Text(mode == .login ? "Welcome Back" : "Create Account")
+                                .font(.system(size: 26, weight: .heavy))
+                                .foregroundStyle(Color(hex: "#1A237E"))
+                                .animation(nil, value: mode)
+                            Text(mode == .login
+                                 ? "We've missed you and your furry friend!"
+                                 : "Join our pet-loving community!")
+                                .font(.system(size: 13))
+                                .foregroundStyle(Color(hex: "#6C757D"))
+                                .multilineTextAlignment(.center)
+                                .animation(nil, value: mode)
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.top, 22)
+                        .padding(.bottom, 16)
+                        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: mode)
+
+                        // Scrollable form — capped so it never bloats into blank space
+                        ScrollView(.vertical, showsIndicators: false) {
+                            Group {
+                                if mode == .login {
+                                    LoginFormContent()
+                                        .transition(.asymmetric(
+                                            insertion: .move(edge: .leading).combined(with: .opacity),
+                                            removal:   .move(edge: .trailing).combined(with: .opacity)
+                                        ))
+                                } else {
+                                    SignUpFormContent()
+                                        .transition(.asymmetric(
+                                            insertion: .move(edge: .trailing).combined(with: .opacity),
+                                            removal:   .move(edge: .leading).combined(with: .opacity)
+                                        ))
+                                }
+                            }
+                            .animation(.spring(response: 0.35, dampingFraction: 0.85), value: mode)
+                        }
+                        .frame(maxHeight: max(geo.size.height * 0.31, 248))
+
+                        // Mode toggle footer
+                        HStack(spacing: 4) {
+                            if mode == .login {
                                 Text("New to Paw n Furr?")
                                     .font(.system(size: 14, weight: .medium))
-                                    .foregroundStyle(Color(hex: "#6C757D"))
+                                    .foregroundStyle(Color(hex: "#555555"))
                                 Button {
                                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { mode = .signup }
                                 } label: {
@@ -56,12 +92,10 @@ struct AuthView: View {
                                         .foregroundStyle(Color(hex: "#FF6B6B"))
                                 }
                                 .buttonStyle(.plain)
-                            }
-                        } else {
-                            HStack(spacing: 4) {
+                            } else {
                                 Text("Already have an account?")
                                     .font(.system(size: 14, weight: .medium))
-                                    .foregroundStyle(Color(hex: "#6C757D"))
+                                    .foregroundStyle(Color(hex: "#555555"))
                                 Button {
                                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { mode = .login }
                                 } label: {
@@ -72,39 +106,43 @@ struct AuthView: View {
                                 .buttonStyle(.plain)
                             }
                         }
-
-                        // House illustration
-                        VStack(spacing: 2) {
-                            ZStack {
-                                Image(systemName: "house.fill")
-                                    .font(.system(size: 50))
-                                    .foregroundStyle(Color(hex: "#FF8A8A").opacity(0.5))
-                            }
-                            // Pet bowl under house
-                            HStack(spacing: 20) {
-                                Ellipse()
-                                    .fill(Color(hex: "#47C1B1"))
-                                    .frame(width: 30, height: 12)
-                                Ellipse()
-                                    .fill(Color(hex: "#FF9A8B"))
-                                    .frame(width: 30, height: 12)
-                            }
-                        }
+                        .padding(.top, 10)
+                        .padding(.bottom, 38)
                     }
-                    .padding(.top, 24)
-                    .padding(.bottom, 40)
+                    .frame(maxWidth: .infinity)
+                    // ── Glassmorphism ──
+                    .background(
+                        ZStack {
+                            Color.clear.background(.ultraThinMaterial)
+                            Color.white.opacity(0.52)
+                        }
+                        .ignoresSafeArea(edges: .bottom)
+                    )
+                    .cornerRadius(36)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 36, style: .continuous)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [Color.white.opacity(0.85), Color.white.opacity(0.25)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1.5
+                            )
+                    )
+                    .shadow(color: .black.opacity(0.12), radius: 28, x: 0, y: -8)
                 }
             }
-            .scrollIndicators(.hidden)
+            .frame(width: geo.size.width, height: geo.size.height)
         }
+        .ignoresSafeArea()
         .ignoresSafeArea(.keyboard, edges: .bottom)
     }
-
 }
 
-// MARK: - Login Form Card
+// MARK: - Login Form Content
 
-private struct LoginFormCard: View {
+private struct LoginFormContent: View {
     @EnvironmentObject private var authService: AuthService
     @State private var email = ""
     @State private var password = ""
@@ -116,110 +154,88 @@ private struct LoginFormCard: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Card top padding (below pets)
-            Color.clear.frame(height: 40)
+        VStack(spacing: 14) {
+            // Email
+            AuthIconInput(
+                icon: "envelope",
+                iconColor: Color(hex: "#47C1B1"),
+                placeholder: "Email Address",
+                text: $email,
+                showPassword: .constant(false)
+            )
 
-            VStack(spacing: 20) {
-                // Header text
-                VStack(spacing: 6) {
-                    Text("Welcome Back")
-                        .font(.system(size: 26, weight: .heavy))
-                        .foregroundStyle(Color(hex: "#1A237E"))
-                    Text("We've missed you and your furry friend!")
-                        .font(.system(size: 14, weight: .regular))
-                        .foregroundStyle(Color(hex: "#6C757D"))
-                        .multilineTextAlignment(.center)
-                }
+            // Password
+            AuthIconInput(
+                icon: "lock",
+                iconColor: Color(hex: "#7B61FF"),
+                placeholder: "Password",
+                text: $password,
+                isSecure: true,
+                showPassword: $showPassword
+            )
 
-                // Email input
-                AuthIconInput(
-                    icon: "envelope",
-                    iconColor: Color(hex: "#47C1B1"),
-                    placeholder: "Email Address",
-                    text: $email,
-                    showPassword: .constant(false)
-                )
-
-                // Password input
-                AuthIconInput(
-                    icon: "lock",
-                    iconColor: Color(hex: "#7B61FF"),
-                    placeholder: "Password",
-                    text: $password,
-                    isSecure: true,
-                    showPassword: $showPassword
-                )
-
-                // Forgot password
-                HStack {
-                    Spacer()
-                    Button {
-                        showingForgotPassword = true
-                    } label: {
-                        Text("Forgot Password?")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(Color(hex: "#47C1B1"))
-                    }
-                    .buttonStyle(.plain)
-                    .sheet(isPresented: $showingForgotPassword) {
-                        ForgotPasswordSheet(prefillEmail: email)
-                            .environmentObject(authService)
-                    }
-                }
-
-                // Error
-                if let error = authService.authError {
-                    AuthErrorBanner(message: error)
-                }
-
-                // Login button
+            // Forgot password link
+            HStack {
+                Spacer()
                 Button {
-                    Task { await authService.signIn(email: email, password: password) }
+                    showingForgotPassword = true
                 } label: {
-                    HStack(spacing: 8) {
-                        if authService.isLoading {
-                            ProgressView().tint(.white).scaleEffect(0.8)
-                        }
-                        Image(systemName: "pawprint.fill")
-                            .font(.system(size: 18))
-                        Text("Login")
-                            .font(.system(size: 17, weight: .bold))
-                    }
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 55)
+                    Text("Forgot Password?")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color(hex: "#47C1B1"))
                 }
                 .buttonStyle(.plain)
-                .background(
-                    RoundedRectangle(cornerRadius: 30, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color(hex: "#5ED7C6"), Color(hex: "#47C1B1")],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .shadow(color: Color(hex: "#47C1B1").opacity(0.4), radius: 12, x: 0, y: 6)
-                )
-                .disabled(!canSubmit || authService.isLoading)
-                .opacity(canSubmit ? 1.0 : 0.6)
-
-                // Divider
+                .sheet(isPresented: $showingForgotPassword) {
+                    ForgotPasswordSheet(prefillEmail: email)
+                        .environmentObject(authService)
+                }
             }
-            .padding(24)
+
+            // Error banner
+            if let error = authService.authError {
+                AuthErrorBanner(message: error)
+            }
+
+            // Login button
+            Button {
+                Task { await authService.signIn(email: email, password: password) }
+            } label: {
+                HStack(spacing: 8) {
+                    if authService.isLoading {
+                        ProgressView().tint(.white).scaleEffect(0.8)
+                    }
+                    Image(systemName: "pawprint.fill")
+                        .font(.system(size: 17))
+                    Text("Login")
+                        .font(.system(size: 17, weight: .bold))
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 54)
+            }
+            .buttonStyle(.plain)
+            .background(
+                RoundedRectangle(cornerRadius: 27, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color(hex: "#5ED7C6"), Color(hex: "#47C1B1")],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .shadow(color: Color(hex: "#47C1B1").opacity(0.4), radius: 12, x: 0, y: 6)
+            )
+            .disabled(!canSubmit || authService.isLoading)
+            .opacity(canSubmit ? 1.0 : 0.6)
         }
-        .background(
-            RoundedRectangle(cornerRadius: 35, style: .continuous)
-                .fill(Color.white)
-                .shadow(color: .black.opacity(0.05), radius: 20, x: 0, y: 10)
-        )
+        .padding(.horizontal, 24)
+        .padding(.bottom, 10)
     }
 }
 
-// MARK: - Sign Up Form Card
+// MARK: - Sign Up Form Content
 
-private struct SignUpFormCard: View {
+private struct SignUpFormContent: View {
     @EnvironmentObject private var authService: AuthService
     @State private var email = ""
     @State private var password = ""
@@ -243,122 +259,103 @@ private struct SignUpFormCard: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            Color.clear.frame(height: 40)
+        VStack(spacing: 14) {
+            AuthIconInput(
+                icon: "envelope",
+                iconColor: Color(hex: "#47C1B1"),
+                placeholder: "Email Address",
+                text: $email,
+                showPassword: .constant(false)
+            )
 
-            VStack(spacing: 18) {
-                VStack(spacing: 6) {
-                    Text("Create Account")
-                        .font(.system(size: 26, weight: .heavy))
-                        .foregroundStyle(Color(hex: "#1A237E"))
-                    Text("Join our pet-loving community!")
-                        .font(.system(size: 14))
-                        .foregroundStyle(Color(hex: "#6C757D"))
-                        .multilineTextAlignment(.center)
-                }
+            AuthIconInput(
+                icon: "lock",
+                iconColor: Color(hex: "#7B61FF"),
+                placeholder: "Password",
+                text: $password,
+                isSecure: true,
+                showPassword: $showPassword
+            )
 
-                AuthIconInput(
-                    icon: "envelope",
-                    iconColor: Color(hex: "#47C1B1"),
-                    placeholder: "Email Address",
-                    text: $email,
-                    showPassword: .constant(false)
-                )
-
-                AuthIconInput(
-                    icon: "lock",
-                    iconColor: Color(hex: "#7B61FF"),
-                    placeholder: "Password",
-                    text: $password,
-                    isSecure: true,
-                    showPassword: $showPassword
-                )
-
-                if !password.isEmpty {
-                    AuthStrengthBar(strength: passwordStrength)
-                }
-
-                AuthIconInput(
-                    icon: "lock.fill",
-                    iconColor: Color(hex: "#FF9A8B"),
-                    placeholder: "Confirm Password",
-                    text: $confirmPassword,
-                    isSecure: true,
-                    showPassword: $showPassword
-                )
-
-                if passwordsMismatch {
-                    HStack(spacing: 4) {
-                        Image(systemName: "exclamationmark.circle.fill")
-                            .font(.system(size: 11))
-                        Text("Passwords don't match")
-                            .font(.system(size: 12, weight: .medium))
-                    }
-                    .foregroundStyle(Color(hex: "#DC2626"))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-
-                // Terms toggle
-                Button {
-                    agreeTerms.toggle()
-                } label: {
-                    HStack(spacing: 7) {
-                        Image(systemName: agreeTerms ? "checkmark.square.fill" : "square")
-                            .font(.system(size: 18))
-                            .foregroundStyle(agreeTerms ? Color(hex: "#47C1B1") : Color(hex: "#A0A0A0"))
-                        Text("I agree to Terms & Privacy Policy")
-                            .font(.system(size: 12))
-                            .foregroundStyle(Color(hex: "#444444"))
-                    }
-                }
-                .buttonStyle(.plain)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                if let error = authService.authError {
-                    AuthErrorBanner(message: error)
-                }
-
-                // Sign up button
-                Button {
-                    Task { await authService.signUp(email: email, password: password) }
-                } label: {
-                    HStack(spacing: 8) {
-                        if authService.isLoading {
-                            ProgressView().tint(.white).scaleEffect(0.8)
-                        }
-                        Image(systemName: "pawprint.fill")
-                            .font(.system(size: 18))
-                        Text("Sign Up")
-                            .font(.system(size: 17, weight: .bold))
-                    }
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 55)
-                }
-                .buttonStyle(.plain)
-                .background(
-                    RoundedRectangle(cornerRadius: 30, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color(hex: "#5ED7C6"), Color(hex: "#47C1B1")],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .shadow(color: Color(hex: "#47C1B1").opacity(0.4), radius: 12, x: 0, y: 6)
-                )
-                .disabled(!canSubmit || authService.isLoading)
-                .opacity(canSubmit ? 1.0 : 0.6)
-
-                // Divider
+            if !password.isEmpty {
+                AuthStrengthBar(strength: passwordStrength)
             }
-            .padding(24)
+
+            AuthIconInput(
+                icon: "lock.fill",
+                iconColor: Color(hex: "#FF9A8B"),
+                placeholder: "Confirm Password",
+                text: $confirmPassword,
+                isSecure: true,
+                showPassword: $showPassword
+            )
+
+            if passwordsMismatch {
+                HStack(spacing: 4) {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .font(.system(size: 11))
+                    Text("Passwords don't match")
+                        .font(.system(size: 12, weight: .medium))
+                }
+                .foregroundStyle(Color(hex: "#DC2626"))
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            // Terms toggle
+            Button {
+                agreeTerms.toggle()
+            } label: {
+                HStack(spacing: 7) {
+                    Image(systemName: agreeTerms ? "checkmark.square.fill" : "square")
+                        .font(.system(size: 18))
+                        .foregroundStyle(agreeTerms ? Color(hex: "#47C1B1") : Color(hex: "#A0A0A0"))
+                    Text("I agree to Terms & Privacy Policy")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color(hex: "#444444"))
+                }
+            }
+            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            // Error banner
+            if let error = authService.authError {
+                AuthErrorBanner(message: error)
+            }
+
+            // Sign up button
+            Button {
+                Task { await authService.signUp(email: email, password: password) }
+            } label: {
+                HStack(spacing: 8) {
+                    if authService.isLoading {
+                        ProgressView().tint(.white).scaleEffect(0.8)
+                    }
+                    Image(systemName: "pawprint.fill")
+                        .font(.system(size: 17))
+                    Text("Sign Up")
+                        .font(.system(size: 17, weight: .bold))
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 54)
+            }
+            .buttonStyle(.plain)
+            .background(
+                RoundedRectangle(cornerRadius: 27, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color(hex: "#5ED7C6"), Color(hex: "#47C1B1")],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .shadow(color: Color(hex: "#47C1B1").opacity(0.4), radius: 12, x: 0, y: 6)
+            )
+            .disabled(!canSubmit || authService.isLoading)
+            .opacity(canSubmit ? 1.0 : 0.6)
         }
-        .background(
-            RoundedRectangle(cornerRadius: 35, style: .continuous)
-                .fill(Color.white)
-                .shadow(color: .black.opacity(0.05), radius: 20, x: 0, y: 10)
-        )
+        .padding(.horizontal, 24)
+        .padding(.bottom, 10)
     }
 }
 
@@ -376,7 +373,7 @@ struct AuthIconInput: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 18))
+                .font(.system(size: 17))
                 .foregroundStyle(iconColor)
                 .frame(width: 22)
 
@@ -399,27 +396,31 @@ struct AuthIconInput: View {
                     showPassword.toggle()
                 } label: {
                     Image(systemName: showPassword ? "eye.slash" : "eye")
-                        .font(.system(size: 15))
+                        .font(.system(size: 14))
                         .foregroundStyle(Color(hex: "#A0A0A0"))
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 15)
-        .padding(.vertical, 14)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 13)
         .background(
-            RoundedRectangle(cornerRadius: 15, style: .continuous)
-                .fill(Color(hex: "#F8F9FA"))
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                // Frosted white — sits cleanly on the glass panel
+                .fill(Color.white.opacity(0.72))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 15, style: .continuous)
-                .stroke(focused ? iconColor.opacity(0.5) : Color(hex: "#E9ECEF"), lineWidth: focused ? 1.5 : 1)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(
+                    focused ? iconColor.opacity(0.55) : Color.white.opacity(0.9),
+                    lineWidth: focused ? 1.5 : 1
+                )
         )
         .animation(.easeOut(duration: 0.15), value: focused)
     }
 }
 
-// MARK: - Strength Bar
+// MARK: - Password Strength Bar
 
 private enum AuthPasswordStrength {
     case weak, fair, good, strong
@@ -432,35 +433,33 @@ private enum AuthPasswordStrength {
         if password.rangeOfCharacter(from: CharacterSet(charactersIn: "!@#$%^&*()_+-=[]{}|;:'\",.<>?/")) != nil { score += 1 }
         switch score {
         case 0...1: return .weak
-        case 2: return .fair
-        case 3: return .good
-        default: return .strong
+        case 2:     return .fair
+        case 3:     return .good
+        default:    return .strong
         }
     }
 
     var color: Color {
         switch self {
-        case .weak: return Color(hex: "#DC2626")
-        case .fair: return Color(hex: "#F59E0B")
-        case .good: return Color(hex: "#4CAF74")
+        case .weak:   return Color(hex: "#DC2626")
+        case .fair:   return Color(hex: "#F59E0B")
+        case .good:   return Color(hex: "#4CAF74")
         case .strong: return Color(hex: "#1A237E")
         }
     }
-
     var label: String {
         switch self {
-        case .weak: return "Weak"
-        case .fair: return "Fair"
-        case .good: return "Good"
+        case .weak:   return "Weak"
+        case .fair:   return "Fair"
+        case .good:   return "Good"
         case .strong: return "Strong"
         }
     }
-
     var fillWidth: CGFloat {
         switch self {
-        case .weak: return 0.25
-        case .fair: return 0.5
-        case .good: return 0.75
+        case .weak:   return 0.25
+        case .fair:   return 0.5
+        case .good:   return 0.75
         case .strong: return 1.0
         }
     }
@@ -528,7 +527,6 @@ private struct ForgotPasswordSheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 28) {
-                // Icon
                 ZStack {
                     Circle()
                         .fill(Color(hex: "#47C1B1").opacity(0.12))
