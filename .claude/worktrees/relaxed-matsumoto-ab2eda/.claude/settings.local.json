@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xcrun simctl *)",
+      "Bash(ls -la *.xcodeproj)",
+      "Bash(ls -la *.xcworkspace)",
+      "Bash(ls -la Podfile)",
+      "Bash(xcodebuild -project Pawly.xcodeproj -scheme PetBuddyCare -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build)",
+      "Bash(xcodebuild -project Pawly.xcodeproj -list)",
+      "Bash(xcodebuild -project Pawly.xcodeproj -scheme Pawly -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build)",
+      "Bash(xcodegen generate *)",
+      "Bash(xcodebuild -project PawBuddyCare.xcodeproj -scheme PawBuddyCare -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build)",
+      "Bash(awk 'NR>=195 && NR<=256 { printf \"%3d | %s\\\\n\", NR, $0 }' Features/Auth/AuthView.swift)",
+      "Bash(xcodebuild -project PawBuddyCare.xcodeproj -scheme PawBuddyCare -configuration Debug build)",
+      "Bash(xcodebuild -project PawBuddyCare.xcodeproj -scheme PawBuddyCare -configuration Debug clean build)",
+      "Bash(claude config *)",
+      "Bash(ls *.xcodeproj)",
+      "Bash(ls *.xcworkspace)",
+      "WebFetch(domain:minimax-algeng-chat-tts-us.oss-us-east-1.aliyuncs.com)",
+      "WebFetch(domain:api.anthropic.com)",
+      "Read(//private/tmp/**)",
+      "Bash(rm -rf pbc_design)",
+      "Bash(mkdir pbc_design)",
+      "Bash(gunzip -c \"/Users/nawajishmaeen/.claude/projects/-Users-nawajishmaeen-Documents-Tristar-Immigration-Tourist-Visa-Clients-Project-Chintu/476fa78c-5773-4c05-aa3e-cc1d0bf2f245/tool-results/webfetch-1778439749688-or33qs.bin\")",
+      "Bash(tar -xvf - -C pbc_design)",
+      "Bash(xcodebuild -project PawBuddyCare.xcodeproj -scheme PawBuddyCare -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 16' build)",
+      "Bash(xcodebuild -project PawBuddyCare.xcodeproj -scheme PawBuddyCare -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 17' build)",
+      "Bash(grep *)",
+      "Bash(xcodebuild -project PawBuddyCare.xcodeproj -target PawBuddyCare -addSourceFiles \"Features/Vault/VaultUploadSheetWrapper.swift\" build)",
+      "Bash(xcodebuild -project \"/Users/nawajishmaeen/Documents/Tristar Immigration/Tourist Visa Clients/Project Chintu/PawBuddyCare.xcodeproj\" -scheme PawBuddyCare -destination 'platform=iOS Simulator,name=iPhone 17' build)",
+      "Bash(xcodebuild -project Pawly.xcodeproj -scheme Pawly -destination 'platform=iOS Simulator,name=iPhone 17' build)"
+    ]
+  }
+}
